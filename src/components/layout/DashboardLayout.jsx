@@ -1026,7 +1026,7 @@ export default function DashboardLayout() {
             >
               <span className="flex items-center gap-2">
                 <Crown size={18} />
-                {clinic?.paystackSubscriptionStatus || clinic?.stripeSubscriptionStatus
+                {clinic?.paystackSubscriptionStatus
                   ? "Your paid plan access has expired. Clinic operations are locked until renewal."
                   : "Your 14-day free trial has ended. Select a paid plan to restore full clinic operations."}
               </span>
@@ -1035,7 +1035,7 @@ export default function DashboardLayout() {
                   onClick={() => navigate("/upgrade")}
                   className="bg-white/20 hover:bg-white/30 px-4 py-1.5 rounded-full text-xs transition-colors border border-white/30 backdrop-blur-sm shadow-sm"
                 >
-                  {clinic?.paystackSubscriptionStatus || clinic?.stripeSubscriptionStatus ? "Renew Now" : "Upgrade Plan"}
+                  {clinic?.paystackSubscriptionStatus ? "Renew Now" : "Upgrade Plan"}
                 </button>
               )}
             </MotionDiv>
@@ -1269,7 +1269,6 @@ export default function DashboardLayout() {
     </div>
   );
 }
-
 
 
 

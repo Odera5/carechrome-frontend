@@ -5,12 +5,6 @@ export const ACTIVE_PAYSTACK_SUBSCRIPTION_STATUSES = [
   "non-renewing",
 ];
 
-export const ACTIVE_STRIPE_SUBSCRIPTION_STATUSES = [
-  "active",
-  "trialing",
-  "non-renewing",
-];
-
 export const CANCELLED_PAYSTACK_SUBSCRIPTION_STATUSES = [
   "non-renewing",
   "cancelled",
@@ -18,18 +12,10 @@ export const CANCELLED_PAYSTACK_SUBSCRIPTION_STATUSES = [
   "completed",
 ];
 
-export const CANCELLED_STRIPE_SUBSCRIPTION_STATUSES = [
-  "non-renewing",
-  "canceled",
-  "cancelled",
-  "incomplete_expired",
-];
-
 export const resolveSubscriptionEndDate = (clinic) => {
   const dates = [
     clinic?.subscriptionEnds,
     clinic?.paystackNextPaymentDate,
-    clinic?.stripeNextPaymentDate,
   ]
     .filter(Boolean)
     .map((d) => new Date(d))
@@ -37,16 +23,6 @@ export const resolveSubscriptionEndDate = (clinic) => {
 
   if (dates.length === 0) return null;
   return new Date(Math.max(...dates.map((d) => d.getTime())));
-};
-
-export const getSubscriptionProvider = (clinic) => {
-  if (clinic?.stripeSubscriptionId || clinic?.stripeSubscriptionStatus) {
-    return "stripe";
-  }
-  if (clinic?.paystackSubscriptionCode || clinic?.paystackSubscriptionStatus) {
-    return "paystack";
-  }
-  return null;
 };
 
 export const isCancelledPaidSubscription = (clinic) => {
@@ -58,11 +34,7 @@ export const isCancelledPaidSubscription = (clinic) => {
     ).toLowerCase(),
   );
 
-  const isStripeCancelled = CANCELLED_STRIPE_SUBSCRIPTION_STATUSES.includes(
-    String(clinic?.stripeSubscriptionStatus || "").toLowerCase(),
-  );
-
-  return isPaystackCancelled || isStripeCancelled;
+  return isPaystackCancelled;
 };
 
 export const hasActivePaidSubscription = (clinic) => {
@@ -74,11 +46,7 @@ export const hasActivePaidSubscription = (clinic) => {
     ).toLowerCase(),
   );
 
-  const hasStripeStatus = ACTIVE_STRIPE_SUBSCRIPTION_STATUSES.includes(
-    String(clinic?.stripeSubscriptionStatus || "").toLowerCase(),
-  );
-
-  if (!hasPaystackStatus && !hasStripeStatus) return false;
+  if (!hasPaystackStatus) return false;
 
   const resolvedEnds = resolveSubscriptionEndDate(clinic);
 
@@ -150,4 +118,3 @@ export const getTrialDaysRemaining = (clinic) => {
     Math.ceil((endDate - nowDate) / (1000 * 60 * 60 * 24)),
   );
 };
-
