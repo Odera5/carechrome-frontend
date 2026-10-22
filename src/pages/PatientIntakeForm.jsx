@@ -32,6 +32,7 @@ export default function PatientIntakeForm() {
     otherName: "",
     dateOfBirth: "",
     age: "",
+    occupation: "",
     gender: "other",
     phone: "",
     email: "",
@@ -369,6 +370,7 @@ export default function PatientIntakeForm() {
                            <div className="md:col-span-2">
                              <Input label="Other Name" name="otherName" value={form.otherName} onChange={handleChange} placeholder="Optional" className="bg-slate-50 h-14 rounded-xl border-slate-200 text-lg" />
                            </div>
+                           <Input label="Occupation" name="occupation" value={form.occupation} onChange={handleChange} placeholder="Optional" className="bg-slate-50 h-14 rounded-xl border-slate-200 text-lg" />
                            <Input label="Date of Birth *" name="dateOfBirth" type="date" value={form.dateOfBirth} onChange={handleDateOfBirthChange} required className="bg-slate-50 h-14 rounded-xl border-slate-200 text-lg" />
                            <Input label="Age (Auto-calculated)" name="age" type="number" value={form.age} placeholder="Auto-calculated" disabled={true} required className="bg-slate-50 h-14 rounded-xl border-slate-200 text-lg" />
                            <div className="space-y-1.5">

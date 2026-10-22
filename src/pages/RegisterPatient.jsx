@@ -17,6 +17,7 @@ const emptyPatientForm = {
   otherName: "",
   dateOfBirth: "",
   age: "",
+  occupation: "",
   email: "",
   gender: "other",
   phone: "",
@@ -83,6 +84,7 @@ export default function RegisterPatient() {
         age: form.age.toString(),
         dateOfBirth: form.dateOfBirth || "",
         gender: form.gender || "other",
+        occupation: form.occupation?.trim() || "",
         phone: form.phone?.trim() || "",
         address: form.address?.trim() || "",
         email: form.email?.trim() || "",
@@ -299,6 +301,16 @@ export default function RegisterPatient() {
                     required
                   />
                 </div>
+
+                <Input
+                  label="Occupation"
+                  name="occupation"
+                  icon={User}
+                  value={form.occupation || ""}
+                  onChange={handleChange}
+                  placeholder="Optional"
+                  disabled={loading}
+                />
               </div>
 
               {/* Section 3: Next of Kin */}

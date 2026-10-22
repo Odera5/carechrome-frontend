@@ -19,7 +19,10 @@ import {
   subscribeDashboardSummary,
   readDashboardSummaryCache,
 } from "../services/dashboardSummary";
-import { hasActiveProAccess } from "../utils/clinicAccess";
+import {
+  hasActiveProAccess,
+  hasEnterpriseAccess,
+} from "../utils/clinicAccess";
 import { getStoredUserObject } from "../utils/authStorage";
 
 const PATIENTS_PER_PAGE = 25;
@@ -47,6 +50,7 @@ export default function Dashboard() {
   const cachedSummary = readDashboardSummaryCache().data;
 
   const storedUser = getStoredUserObject() || {};
+  const enterpriseAccess = hasEnterpriseAccess(storedUser?.clinic);
   const user = {
     role: storedUser.role || "nurse",
   };
@@ -161,7 +165,6 @@ export default function Dashboard() {
   }, [showBirthdayModal]);
 
   const showTrash = location.search.includes("tab=trash");
-  const clinicPlan = storedUser?.clinic?.plan || "PRO";
   const proAccessActive = hasActiveProAccess(storedUser?.clinic);
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(searchQuery.trim());
   useEffect(() => {
@@ -554,7 +557,7 @@ export default function Dashboard() {
                   className="bg-white"
                 />
               </div>
-              {clinicPlan === "ENTERPRISE" && !showTrash && (
+              {enterpriseAccess && !showTrash && (
                 <button
                   type="button"
                   onClick={() => setDirectoryState(s => ({ ...s, globalSearch: !s.globalSearch }))}
@@ -765,4 +768,3 @@ export default function Dashboard() {
     </motion.div>
   );
 }
-

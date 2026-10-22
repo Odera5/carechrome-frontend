@@ -637,6 +637,10 @@ export default function PendingIntakes() {
                                 </h4>
                                 <div className="space-y-2 text-sm text-slate-600">
                                   <div className="flex items-start gap-2.5">
+                                    <User size={16} className="mt-0.5 shrink-0 text-slate-400" />
+                                    <span>Occupation: {intake.occupation || "Not provided"}</span>
+                                  </div>
+                                  <div className="flex items-start gap-2.5">
                                     <Mail size={16} className="mt-0.5 shrink-0 text-slate-400" />
                                     <span className="break-all">{intake.email || "No email provided"}</span>
                                   </div>

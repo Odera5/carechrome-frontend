@@ -5,6 +5,7 @@ import {
   getPatientPickerOptionById,
   getPatientPickerOptions,
 } from "../../services/patientDirectory";
+import { hasEnterpriseAccess } from "../../utils/clinicAccess";
 import { getStoredUserObject } from "../../utils/authStorage";
 import Input from "./Input";
 
@@ -27,8 +28,7 @@ export default function PatientPicker({
   const dropdownRef = useRef(null);
 
   const storedUser = getStoredUserObject() || {};
-  const clinicPlan = storedUser?.clinic?.plan || "PRO";
-  const isEnterprise = clinicPlan === "ENTERPRISE";
+  const isEnterprise = hasEnterpriseAccess(storedUser?.clinic);
   const [globalSearch, setGlobalSearch] = useState(false);
 
   useEffect(() => {

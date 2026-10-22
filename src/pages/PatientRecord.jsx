@@ -58,7 +58,7 @@ export default function PatientRecord() {
   });
   const [patientForm, setPatientForm, clearPatientFormDraft] = usePersistentState(
     patientEditDraftKey,
-    { name: "", cardNumber: "", age: "", dateOfBirth: "", gender: "other", phone: "", email: "", address: "", nextOfKinName: "", nextOfKinPhone: "", nextOfKinRelationship: "", nextOfKinAddress: "" },
+    { name: "", cardNumber: "", age: "", dateOfBirth: "", gender: "other", occupation: "", phone: "", email: "", address: "", nextOfKinName: "", nextOfKinPhone: "", nextOfKinRelationship: "", nextOfKinAddress: "" },
   );
 
   const [newRecord, setNewRecord, clearNewRecordDraft] = usePersistentState(
@@ -160,6 +160,7 @@ export default function PatientRecord() {
           setPatientForm({
             name: resPatient.data?.name || "", cardNumber: resPatient.data?.cardNumber || "",
             age: resPatient.data?.age || "", dateOfBirth: resPatient.data?.dateOfBirth || "", gender: resPatient.data?.gender || "other",
+            occupation: resPatient.data?.occupation || "",
             phone: resPatient.data?.phone || "", email: resPatient.data?.email || "", address: resPatient.data?.address || "",
             nextOfKinName: resPatient.data?.nextOfKinName || "", nextOfKinPhone: resPatient.data?.nextOfKinPhone || "",
             nextOfKinRelationship: resPatient.data?.nextOfKinRelationship || "", nextOfKinAddress: resPatient.data?.nextOfKinAddress || "",
@@ -325,6 +326,7 @@ export default function PatientRecord() {
     setPatientForm({
       name: patient.name || "", cardNumber: patient.cardNumber || "", age: patient.age || "",
       dateOfBirth: patient.dateOfBirth || "",
+      occupation: patient.occupation || "",
       gender: patient.gender || "other", phone: patient.phone || "", email: patient.email || "", address: patient.address || "",
       nextOfKinName: patient.nextOfKinName || "", nextOfKinPhone: patient.nextOfKinPhone || "",
       nextOfKinRelationship: patient.nextOfKinRelationship || "", nextOfKinAddress: patient.nextOfKinAddress || "",
@@ -378,8 +380,14 @@ export default function PatientRecord() {
           </div>
         </div>
 
-        {(patient.email || patient.address || patient.nextOfKinName) && (
+        {(patient.email || patient.address || patient.occupation || patient.nextOfKinName) && (
           <div className="mt-4 pt-4 border-t border-slate-100 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-slate-600">
+            {patient.occupation && (
+              <div>
+                <span className="font-semibold text-slate-700 block text-xs uppercase tracking-wider mb-0.5">Occupation</span>
+                <span className="break-words">{patient.occupation}</span>
+              </div>
+            )}
             {patient.email && (
               <div>
                 <span className="font-semibold text-slate-700 block text-xs uppercase tracking-wider mb-0.5">Email</span>
@@ -479,6 +487,7 @@ export default function PatientRecord() {
               <Input label="Date of Birth *" name="dateOfBirth" type="date" value={patientForm.dateOfBirth || ""} onChange={handleDateOfBirthChange} disabled={patientSaveLoading} className="bg-white" required />
               <Input label="Age (Auto-calculated)" name="age" type="number" value={patientForm.age} disabled={true} className="bg-slate-100 text-slate-500 h-[46px]" required />
               <div className="space-y-1.5 focus-within:text-primary-600"><label className="text-sm font-semibold text-slate-700 leading-none">Sex</label><select name="gender" value={patientForm.gender} onChange={handlePatientFormChange} disabled={patientSaveLoading} className="w-full rounded-xl border border-slate-200 p-3 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 shadow-sm h-[46px] capitalize"><option value="male">Male</option><option value="female">Female</option><option value="other">Other</option></select></div>
+              <Input label="Occupation" name="occupation" value={patientForm.occupation || ""} onChange={handlePatientFormChange} disabled={patientSaveLoading} className="bg-white" />
               <Input label="Phone Number *" name="phone" value={patientForm.phone} onChange={handlePatientFormChange} disabled={patientSaveLoading} className="bg-white" required />
               <Input label="Email Address" name="email" type="email" value={patientForm.email} onChange={handlePatientFormChange} disabled={patientSaveLoading} className="bg-white" />
               <div className="sm:col-span-2 space-y-1.5"><label className="text-sm font-semibold text-slate-700 leading-none">Home Address *</label><textarea name="address" value={patientForm.address} onChange={handlePatientFormChange} disabled={patientSaveLoading} rows="2" className="w-full rounded-xl border border-slate-200 p-3 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 shadow-sm resize-none" required /></div>

@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import api from "../services/api";
 import Toast from "../components/Toast";
+import { getStoredUserObject } from "../utils/authStorage";
 
 const isSubscriptionPlanLog = (log) => {
   const action = String(log?.action || "").toLowerCase();
@@ -128,6 +129,8 @@ const formatIpAddress = (ip) => {
 };
 
 export default function AuditLogs() {
+  const currentUser = getStoredUserObject() || {};
+  const isAdmin = currentUser.role === "admin";
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState({ message: "", type: "", show: false });
@@ -136,6 +139,7 @@ export default function AuditLogs() {
   const [availableActions, setAvailableActions] = useState([]);
   const [availableResources, setAvailableResources] = useState([]);
   const [availableActors, setAvailableActors] = useState([]);
+  const [availableBranches, setAvailableBranches] = useState([]);
 
   // Active filters state
   const [search, setSearch] = useState("");
@@ -150,6 +154,7 @@ export default function AuditLogs() {
   const [actionFilter, setActionFilter] = useState("");
   const [resourceFilter, setResourceFilter] = useState("");
   const [actorFilter, setActorFilter] = useState("");
+  const [branchFilter, setBranchFilter] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
@@ -180,6 +185,7 @@ export default function AuditLogs() {
           action: actionFilter || undefined,
           resourceType: resourceFilter || undefined,
           actorId: actorFilter || undefined,
+          branchId: isAdmin ? branchFilter || undefined : undefined,
           startDate: startDate || undefined,
           endDate: endDate || undefined,
         },
@@ -194,6 +200,7 @@ export default function AuditLogs() {
         setAvailableActions(response.data.filters.actions || []);
         setAvailableResources(response.data.filters.resourceTypes || []);
         setAvailableActors(response.data.filters.actors || []);
+        setAvailableBranches(response.data.filters.branches || []);
       }
     } catch (error) {
       console.error("Failed to load audit logs:", error);
@@ -201,7 +208,7 @@ export default function AuditLogs() {
     } finally {
       setLoading(false);
     }
-  }, [currentPage, limit, debouncedSearch, actionFilter, resourceFilter, actorFilter, startDate, endDate]);
+  }, [currentPage, limit, debouncedSearch, actionFilter, resourceFilter, actorFilter, branchFilter, startDate, endDate, isAdmin]);
 
   useEffect(() => {
     fetchAuditLogs();
@@ -214,7 +221,7 @@ export default function AuditLogs() {
 
   useEffect(() => {
     handleFilterChange();
-  }, [debouncedSearch, actionFilter, resourceFilter, actorFilter, startDate, endDate]);
+  }, [debouncedSearch, actionFilter, resourceFilter, actorFilter, branchFilter, startDate, endDate]);
 
   const clearFilters = () => {
     setSearch("");
@@ -222,6 +229,7 @@ export default function AuditLogs() {
     setActionFilter("");
     setResourceFilter("");
     setActorFilter("");
+    setBranchFilter("");
     setStartDate("");
     setEndDate("");
     setCurrentPage(1);
@@ -241,7 +249,9 @@ export default function AuditLogs() {
         <div>
           <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Activity Logs</h2>
           <p className="text-sm text-slate-500 mt-1">
-            Real-time security auditing and activity tracking for this clinic space.
+            {isAdmin
+              ? "Review activity across your clinic and filter by branch."
+              : "Review activity recorded at your active branch."}
           </p>
         </div>
         <button
@@ -289,6 +299,23 @@ export default function AuditLogs() {
               ))}
             </select>
           </div>
+
+          {isAdmin && (
+            <div>
+              <select
+                value={branchFilter}
+                onChange={(e) => setBranchFilter(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl px-4 py-2.5 outline-none focus:border-primary-500 focus:bg-white transition-all cursor-pointer"
+              >
+                <option value="">All Branches</option>
+                {availableBranches.map((branch) => (
+                  <option key={branch.id} value={branch.id}>
+                    {branch.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Resource Filter */}
           <div>
@@ -348,7 +375,7 @@ export default function AuditLogs() {
         </div>
 
         {/* Clear Filters indicator */}
-        {(search || actionFilter || resourceFilter || actorFilter || startDate || endDate) && (
+        {(search || actionFilter || resourceFilter || actorFilter || branchFilter || startDate || endDate) && (
           <div className="flex justify-end pt-2 border-t border-slate-100">
             <button
               onClick={clearFilters}
@@ -369,6 +396,7 @@ export default function AuditLogs() {
               <tr className="bg-slate-50 border-b border-slate-200 font-semibold text-slate-700">
                 <th className="p-4 w-52">Timestamp</th>
                 <th className="p-4">Staff Member</th>
+                <th className="p-4">Branch</th>
                 <th className="p-4 w-44">Action Taken</th>
                 <th className="p-4">Resource Target</th>
                 <th className="p-4 text-center w-24">Actions</th>
@@ -377,7 +405,7 @@ export default function AuditLogs() {
             <tbody className="divide-y divide-slate-100 bg-white">
               {loading ? (
                 <tr>
-                  <td colSpan="5" className="text-center p-16">
+                  <td colSpan="6" className="text-center p-16">
                     <div className="flex flex-col items-center gap-3">
                       <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-600 border-t-transparent"></div>
                       <span className="text-slate-500 font-medium">Fetching secure records...</span>
@@ -386,7 +414,7 @@ export default function AuditLogs() {
                 </tr>
               ) : logs.length === 0 ? (
                 <tr>
-                  <td colSpan="5" className="text-center p-16 text-slate-400">
+                  <td colSpan="6" className="text-center p-16 text-slate-400">
                     <div className="flex flex-col items-center gap-3">
                       <Database size={40} className="text-slate-300" />
                       <span className="font-semibold text-slate-500">No activity logs found</span>
@@ -445,6 +473,12 @@ export default function AuditLogs() {
                           <span className="text-xs font-medium uppercase tracking-wider">System Process</span>
                         </div>
                       )}
+                    </td>
+
+                    <td className="p-4 whitespace-nowrap">
+                      <span className="font-medium text-slate-700">
+                        {log.branch?.name || "Unassigned / legacy"}
+                      </span>
                     </td>
 
                     {/* Action Taken */}
@@ -620,6 +654,12 @@ export default function AuditLogs() {
                     <div>
                       <span className="text-slate-400 font-medium block">Resource Category:</span>
                       <span className="font-semibold text-slate-800 capitalize">{getResourceLabel(selectedLog)}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 font-medium block">Branch:</span>
+                      <span className="font-semibold text-slate-800">
+                        {selectedLog.branch?.name || "Unassigned / legacy"}
+                      </span>
                     </div>
                     <div className="mt-2">
                       <span className="text-slate-400 font-medium block">Resource Reference ID:</span>

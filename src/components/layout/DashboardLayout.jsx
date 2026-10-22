@@ -452,8 +452,6 @@ export default function DashboardLayout() {
   }, [enterpriseAccess]);
 
   const handleBranchChange = async (nextBranchId) => {
-    if (!isAdmin) return;
-
     const nextBranch = availableBranches.find((branch) => branch.id === nextBranchId);
     if (!nextBranch) return;
 
@@ -615,7 +613,8 @@ export default function DashboardLayout() {
   };
 
   const canDisplayActiveBranch = enterpriseAccess && activeBranch;
-  const canSwitchBranches = canDisplayActiveBranch && isAdmin && availableBranches.length > 0;
+  const canSwitchBranches =
+    canDisplayActiveBranch && availableBranches.length > 1;
 
   // Determine header title based on pathname
   let headerTitle = "Overview";
@@ -776,15 +775,8 @@ export default function DashboardLayout() {
                   location={location}
                   onNavigate={handleNavClick}
                 />
-                {isAdmin && (
+                {(isAdmin || isBranchManager) && (
                   <>
-                    <NavItem
-                      icon={Settings}
-                      label="Clinic Settings"
-                      path="/clinic-settings"
-                      location={location}
-                      onNavigate={handleNavClick}
-                    />
                     <NavItem
                       icon={History}
                       label="Activity Logs"
@@ -792,22 +784,35 @@ export default function DashboardLayout() {
                       location={location}
                       onNavigate={handleNavClick}
                     />
-                    {enterpriseAccess && (
+                    {isAdmin && (
                       <NavItem
-                        icon={Building2}
-                        label="Manage Branches"
-                        path="/branches"
+                        icon={Settings}
+                        label="Clinic Settings"
+                        path="/clinic-settings"
                         location={location}
                         onNavigate={handleNavClick}
                       />
                     )}
-                    <NavItem
-                      icon={Trash2}
-                      label="Trash"
-                      path="/dashboard?tab=trash"
-                      location={location}
-                      onNavigate={handleNavClick}
-                    />
+                    {isAdmin && (
+                      <>
+                        {enterpriseAccess && (
+                          <NavItem
+                            icon={Building2}
+                            label="Manage Branches"
+                            path="/branches"
+                            location={location}
+                            onNavigate={handleNavClick}
+                          />
+                        )}
+                        <NavItem
+                          icon={Trash2}
+                          label="Trash"
+                          path="/dashboard?tab=trash"
+                          location={location}
+                          onNavigate={handleNavClick}
+                        />
+                      </>
+                    )}
                   </>
                 )}
               </div>
@@ -1269,7 +1274,4 @@ export default function DashboardLayout() {
     </div>
   );
 }
-
-
-
 
