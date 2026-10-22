@@ -95,7 +95,9 @@ function HomeRedirect() {
 
   const lastRoute = readLastVisitedRoute(user);
   
-  const fallbackRoute = storedUser ? lastRoute || "/dashboard" : "/login";
+  const fallbackRoute = storedUser
+    ? lastRoute || (user?.role === "billing_staff" ? "/billing" : "/dashboard")
+    : "/login";
 
   return <Navigate to={fallbackRoute} replace />;
 }
@@ -124,12 +126,26 @@ function App() {
 
             {/* Protected routes - wrapped with Sidebar Layout */}
             <Route element={<ProtectedLayout />}>
-              <Route path="/dashboard" element={<Dashboard />} />
+              <Route
+                path="/dashboard"
+                element={
+                  <ProtectedRoute allowedRoles={["admin", "branch_manager", "doctor", "nurse"]}>
+                    <Dashboard />
+                  </ProtectedRoute>
+                }
+              />
               <Route path="/register-patient" element={<RegisterPatient />} />
               <Route path="/appointments" element={<Appointments />} />
               <Route path="/waiting-room" element={<WaitingRoom />} />
               <Route path="/pending-intakes" element={<PendingIntakes />} />
-              <Route path="/billing" element={<Billing />} />
+              <Route
+                path="/billing"
+                element={
+                  <ProtectedRoute allowedRoles={["admin", "billing_staff"]}>
+                    <Billing />
+                  </ProtectedRoute>
+                }
+              />
               <Route
                 path="/upgrade"
                 element={

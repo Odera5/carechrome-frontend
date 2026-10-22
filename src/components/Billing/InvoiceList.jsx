@@ -12,7 +12,6 @@ import { Card, CardContent } from "../ui/Card";
 import usePersistentState from "../../hooks/usePersistentState";
 import { resolveAssetUrl } from "../../utils/assetUrl";
 import { getStoredUserObject } from "../../utils/authStorage";
-import ConfirmModal from "../ui/ConfirmModal";
 
 const formatCurrency = (value) =>
   new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN", minimumFractionDigits: 2 }).format(Number(value) || 0);
@@ -69,7 +68,51 @@ function SummaryRow({ label, value, strong = false }) {
   );
 }
 
-function InvoiceViewer({ invoice: rawInvoice, actionParam, onClose }) {
+function PaymentReceipt({ invoice, payment, onDone }) {
+  return (
+    <div className="print-container mx-auto max-w-2xl rounded-2xl border border-slate-200 bg-white p-8 shadow-xl">
+      <div className="mb-8 flex items-start justify-between gap-4 print:hidden">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-widest text-emerald-700">Payment received</p>
+          <h2 className="mt-1 text-2xl font-bold text-slate-900">Patient Receipt</h2>
+        </div>
+        <div className="flex gap-2">
+          <Button type="button" variant="outline" onClick={onDone} className="!w-auto">Back</Button>
+          <Button type="button" onClick={() => window.print()} className="!w-auto">
+            <Printer size={16} className="mr-2" /> Print Receipt
+          </Button>
+        </div>
+      </div>
+      <div className="border-b border-slate-200 pb-5">
+        <p className="text-xs font-bold uppercase tracking-widest text-slate-500">Receipt number</p>
+        <p className="mt-1 font-mono text-lg font-bold text-slate-900">{payment.receiptNumber}</p>
+        <p className="mt-2 text-sm text-slate-500">
+          {new Date(payment.receivedAt).toLocaleString()}
+        </p>
+      </div>
+      <div className="space-y-3 border-b border-slate-200 py-5 text-sm">
+        <div className="flex justify-between gap-4"><span className="text-slate-500">Patient</span><strong className="text-right text-slate-900">{invoice.patientId?.name || "Patient"}</strong></div>
+        <div className="flex justify-between gap-4"><span className="text-slate-500">Invoice</span><strong className="font-mono text-slate-900">{invoice.invoiceNumber}</strong></div>
+        <div className="flex justify-between gap-4"><span className="text-slate-500">Method</span><strong className="capitalize text-slate-900">{String(payment.paymentMethod).replace("_", " ")}</strong></div>
+        {payment.reference && <div className="flex justify-between gap-4"><span className="text-slate-500">Reference</span><strong className="break-all text-right text-slate-900">{payment.reference}</strong></div>}
+        <div className="flex justify-between gap-4"><span className="text-slate-500">Received by</span><strong className="text-right text-slate-900">{payment.recordedBy?.name || "Clinic staff"}</strong></div>
+      </div>
+      <div className="space-y-3 py-5 text-sm">
+        <SummaryRow label="Payment received" value={formatCurrency(payment.amount)} strong />
+        <SummaryRow label="Invoice total" value={formatCurrency(invoice.total)} />
+        <SummaryRow label="Paid to date" value={formatCurrency(invoice.amountPaid)} />
+        <SummaryRow label="Remaining balance" value={formatCurrency(invoice.balance)} />
+      </div>
+      {payment.paymentMethod !== "cash" && (
+        <p className="border-t border-slate-200 pt-4 text-xs leading-5 text-slate-500">
+          This receipt confirms the payment was recorded by the clinic. Electronic payments remain subject to bank or payment-provider reconciliation.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function InvoiceViewer({ invoice: rawInvoice, actionParam, onClose, onPaymentReceipt }) {
   const invoice = React.useMemo(() => {
     if (actionParam === "invoice.create") {
       return {
@@ -96,17 +139,29 @@ function InvoiceViewer({ invoice: rawInvoice, actionParam, onClose }) {
   const clinic = storedUser?.clinic || {};
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("cash");
+  const [paymentReference, setPaymentReference] = useState("");
   const [paymentNotes, setPaymentNotes] = useState("");
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState({ show: false, message: "", type: "" });
 
   const [confirmCancelOpen, setConfirmCancelOpen] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+  const [reversalTarget, setReversalTarget] = useState(null);
+  const [reversalReason, setReversalReason] = useState("");
+  const [reversalLoading, setReversalLoading] = useState(false);
+  const isAdmin = storedUser?.role === "admin";
 
   const handleCancelInvoice = async () => {
+    if (cancelReason.trim().length < 5) {
+      setToast({ show: true, message: "Provide a cancellation reason (at least 5 characters).", type: "error" });
+      return;
+    }
     setCancelLoading(true);
     try {
-      await api.delete(`/invoices/${getEntityId(invoice)}`);
+      await api.delete(`/invoices/${getEntityId(invoice)}`, {
+        data: { reason: cancelReason.trim() },
+      });
       setToast({ show: true, message: "Invoice cancelled successfully", type: "success" });
       setTimeout(() => {
         setConfirmCancelOpen(false);
@@ -121,12 +176,47 @@ function InvoiceViewer({ invoice: rawInvoice, actionParam, onClose }) {
 
   const handleRecordPayment = async () => {
     if (!paymentAmount || parseFloat(paymentAmount) <= 0) return setToast({ show: true, message: "Enter valid payment amount", type: "error" });
+    if (paymentMethod !== "cash" && !paymentReference.trim()) return setToast({ show: true, message: "A transaction or receipt reference is required for non-cash payments.", type: "error" });
     setLoading(true);
     try {
-      await api.put(`/invoices/${getEntityId(invoice)}/payment`, { amountPaid: parseFloat(paymentAmount), paymentMethod, notes: paymentNotes });
-      setToast({ show: true, message: "Payment recorded", type: "success" });
-      setTimeout(() => { onClose(); }, 1200);
+      const response = await api.post(`/invoices/${getEntityId(invoice)}/payments`, {
+        amount: parseFloat(paymentAmount),
+        paymentMethod,
+        reference: paymentReference.trim(),
+        notes: paymentNotes.trim(),
+      });
+      const savedInvoice = response.data;
+      const savedPayment = (savedInvoice?.payments || [])
+        .filter((payment) => payment.kind === "recorded")
+        .at(-1);
+      if (savedInvoice && savedPayment) {
+        onPaymentReceipt(savedInvoice, savedPayment);
+      } else {
+        setToast({ show: true, message: "Payment recorded, but the receipt could not be loaded.", type: "error" });
+      }
     } catch (error) { setToast({ show: true, message: error.response?.data?.message || "Failed to record payment", type: "error" }); } finally { setLoading(false); }
+  };
+
+  const handleReversePayment = async () => {
+    if (!reversalTarget || reversalReason.trim().length < 5) {
+      setToast({ show: true, message: "Provide a reversal reason (at least 5 characters).", type: "error" });
+      return;
+    }
+    try {
+      setReversalLoading(true);
+      await api.post(
+        `/invoices/${getEntityId(invoice)}/payments/${reversalTarget.id}/reverse`,
+        { reason: reversalReason.trim() },
+      );
+      setToast({ show: true, message: "Payment reversal recorded in the audit trail.", type: "success" });
+      setReversalTarget(null);
+      setReversalReason("");
+      setTimeout(onClose, 700);
+    } catch (error) {
+      setToast({ show: true, message: error.response?.data?.message || "Failed to reverse payment", type: "error" });
+    } finally {
+      setReversalLoading(false);
+    }
   };
 
   return (
@@ -222,7 +312,7 @@ function InvoiceViewer({ invoice: rawInvoice, actionParam, onClose }) {
                {invoice.status === 'paid' && <CheckCircle size={40} className="opacity-50" />}
             </div>
 
-            {invoice.status !== 'cancelled' && invoice.status !== 'paid' && (invoice.amountPaid === 0 || (invoice.payments || []).length === 0) && (
+            {isAdmin && invoice.status !== 'cancelled' && invoice.status !== 'paid' && (invoice.amountPaid === 0 || (invoice.payments || []).length === 0) && (
               <Button
                 variant="outline"
                 className="w-full border-rose-200 text-rose-600 hover:bg-rose-50 hover:border-rose-300 shadow-sm transition-all"
@@ -242,13 +332,28 @@ function InvoiceViewer({ invoice: rawInvoice, actionParam, onClose }) {
              ) : (
                <div className="space-y-3">
                  {(invoice.payments || []).slice().reverse().map((payment) => (
-                   <div key={payment.id} className="rounded-xl bg-white border border-slate-200 p-4 shadow-sm flex items-center justify-between">
+                   <div key={payment.id} className={`rounded-xl bg-white border border-slate-200 p-4 shadow-sm flex items-center justify-between gap-4 ${payment.kind === "reversal" ? "border-rose-200 bg-rose-50/40" : ""}`}>
                      <div>
-                       <p className="font-bold text-slate-900 text-lg mb-0.5">{formatCurrency(payment.amount)}</p>
+                       <p className={`font-bold text-lg mb-0.5 ${payment.kind === "reversal" ? "text-rose-700" : "text-slate-900"}`}>{payment.kind === "reversal" ? "Reversal " : ""}{formatCurrency(payment.amount)}</p>
                        <p className="text-xs text-slate-500 flex items-center"><span className="uppercase tracking-wider font-semibold mr-2">{String(payment.paymentMethod).replace("_", " ")}</span> {new Date(payment.receivedAt).toLocaleString()}</p>
+                       {payment.receiptNumber && <p className="mt-1 font-mono text-xs text-slate-500">{payment.receiptNumber}</p>}
+                       {payment.recordedBy?.name && <p className="mt-1 text-xs text-slate-500">Recorded by {payment.recordedBy.name}</p>}
+                       {payment.reversalReason && <p className="mt-2 text-sm text-rose-700">Reason: {payment.reversalReason}</p>}
                        {payment.notes && <p className="text-sm italic text-slate-600 mt-2 bg-slate-50 p-2 rounded">{payment.notes}</p>}
                      </div>
-                     <CheckCircle size={24} className="text-emerald-500 shrink-0 opacity-50" />
+                     <div className="flex flex-col items-end gap-2">
+                       {payment.kind === "recorded" && (
+                         <Button type="button" variant="outline" onClick={() => onPaymentReceipt(invoice, payment)} className="!w-auto !text-xs">
+                           <Printer size={14} className="mr-1" /> Receipt
+                         </Button>
+                       )}
+                       {isAdmin && payment.kind === "recorded" && !(invoice.payments || []).some((entry) => entry.reversalOfId === payment.id) && (
+                         <Button type="button" variant="outline" onClick={() => setReversalTarget(payment)} className="!w-auto !text-xs border-rose-200 text-rose-700">
+                           Reverse
+                         </Button>
+                       )}
+                       {payment.kind === "reversal" ? <AlertCircle size={22} className="text-rose-500 shrink-0" /> : <CheckCircle size={24} className="text-emerald-500 shrink-0 opacity-50" />}
+                     </div>
                    </div>
                  ))}
                </div>
@@ -261,7 +366,8 @@ function InvoiceViewer({ invoice: rawInvoice, actionParam, onClose }) {
               <div className="space-y-4">
                 <Input label="Amount (NGN)" type="number" step="1" min="0" max={invoice.balance} value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} icon={NairaIcon} className="bg-white" />
                 <div className="space-y-1.5"><label className="text-sm font-semibold text-slate-700">Method</label><div className="relative"><select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} className="w-full rounded-xl border border-slate-200 px-4 py-3 bg-white text-sm focus:ring-2 focus:ring-primary-500 shadow-sm appearance-none h-[46px]"><option value="cash">Cash</option><option value="card">Card / POS</option><option value="bank_transfer">Bank Transfer</option><option value="check">Check</option></select></div></div>
-                <div className="space-y-1.5"><label className="text-sm font-semibold text-slate-700">Notes (optional)</label><textarea value={paymentNotes} onChange={(e) => setPaymentNotes(e.target.value)} rows="2" className="w-full rounded-xl border border-slate-200 p-3 bg-white text-sm focus:ring-2 focus:ring-primary-500 shadow-sm resize-none" placeholder="Reference ID..." /></div>
+                {paymentMethod !== "cash" && <Input label="Transaction / POS reference *" value={paymentReference} onChange={(e) => setPaymentReference(e.target.value)} maxLength={120} className="bg-white" required />}
+                <div className="space-y-1.5"><label className="text-sm font-semibold text-slate-700">Notes (optional)</label><textarea value={paymentNotes} onChange={(e) => setPaymentNotes(e.target.value)} maxLength={500} rows="2" className="w-full rounded-xl border border-slate-200 p-3 bg-white text-sm focus:ring-2 focus:ring-primary-500 shadow-sm resize-none" /></div>
                 <div className="pt-2"> 
                    <p className="text-sm text-slate-600 mb-3 bg-white p-3 rounded-lg border border-emerald-100 flex justify-between">New Balance: <span className="font-bold text-emerald-700">{formatCurrency(Math.max(0, Number(invoice.balance || 0) - Number(paymentAmount || 0)))}</span></p>
                    <Button onClick={handleRecordPayment} isLoading={loading} className="w-full shadow-md bg-emerald-600 hover:bg-emerald-700">Record Payment</Button>
@@ -272,16 +378,60 @@ function InvoiceViewer({ invoice: rawInvoice, actionParam, onClose }) {
         </div>
       </div>
       {toast.show && <Toast message={toast.message} type={toast.type} duration={3000} onClose={() => setToast({ ...toast, show: false })} />}
-      <ConfirmModal
-        isOpen={confirmCancelOpen}
-        onClose={() => setConfirmCancelOpen(false)}
-        onConfirm={handleCancelInvoice}
-        title="Cancel Invoice"
-        message="Are you sure you want to cancel this invoice? This will set its status to CANCELLED and prevent any future payments."
-        confirmText="Yes, Cancel Invoice"
-        danger
-        confirmLoading={cancelLoading}
-      />
+      {confirmCancelOpen && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/50 p-4">
+          <form
+            onSubmit={(event) => { event.preventDefault(); handleCancelInvoice(); }}
+            className="w-full max-w-md space-y-4 rounded-2xl bg-white p-6 shadow-2xl"
+          >
+            <h3 className="text-xl font-bold text-slate-900">Cancel Invoice</h3>
+            <p className="text-sm text-slate-600">
+              Cancelling {invoice.invoiceNumber} is recorded in the activity log. Provide a reason to continue.
+            </p>
+            <textarea
+              value={cancelReason}
+              onChange={(event) => setCancelReason(event.target.value)}
+              maxLength={500}
+              minLength={5}
+              rows={3}
+              required
+              placeholder="Reason for cancellation"
+              className="w-full rounded-xl border border-slate-200 p-3 text-sm"
+            />
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setConfirmCancelOpen(false)} className="!w-auto">Keep Invoice</Button>
+              <Button type="submit" isLoading={cancelLoading} className="!w-auto bg-rose-600 hover:bg-rose-700">Cancel Invoice</Button>
+            </div>
+          </form>
+        </div>
+      )}
+      {reversalTarget && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/50 p-4">
+          <form
+            onSubmit={(event) => { event.preventDefault(); handleReversePayment(); }}
+            className="w-full max-w-lg space-y-4 rounded-2xl bg-white p-6 shadow-2xl"
+          >
+            <h3 className="text-lg font-bold text-slate-900">Reverse Payment</h3>
+            <p className="text-sm text-slate-600">
+              This creates a permanent reversal entry and adjusts the invoice balance. It does not erase the original receipt.
+            </p>
+            <textarea
+              value={reversalReason}
+              onChange={(event) => setReversalReason(event.target.value)}
+              maxLength={500}
+              minLength={5}
+              rows={3}
+              required
+              placeholder="Reason for reversal (required)"
+              className="w-full rounded-xl border border-slate-200 p-3 text-sm"
+            />
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setReversalTarget(null)} className="!w-auto">Keep Payment</Button>
+              <Button type="submit" isLoading={reversalLoading} className="!w-auto bg-rose-600 hover:bg-rose-700">Record Reversal</Button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 }
@@ -303,6 +453,7 @@ export default function InvoiceList({ patientId = null }) {
   );
   const { showForm, filterStatus, searchQuery, selectedPatientId, startDate, endDate } = uiState;
   const [viewingInvoice, setViewingInvoice] = useState(null);
+  const [receiptData, setReceiptData] = useState(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const invoiceIdParam = searchParams.get("invoiceId");
   const actionParam = searchParams.get("action");
@@ -403,6 +554,12 @@ export default function InvoiceList({ patientId = null }) {
   }, [filterStatus, patientId, selectedPatientId, startDate, endDate]);
 
   const handleFormSuccess = () => { clearUiState(); setViewingInvoice(null); fetchInvoices(); fetchReport(); };
+  const handlePaymentReceipt = (invoice, payment) => {
+    setViewingInvoice(null);
+    setReceiptData({ invoice, payment });
+    fetchInvoices();
+    fetchReport();
+  };
   const handleIssueInvoice = async (id) => {
     try { await api.put(`/invoices/${id}/issue`); setToast({ show: true, message: "Invoice issued", type: "success" }); fetchInvoices(); fetchReport(); } catch (error) { setToast({ show: true, message: error.response?.data?.message || "Failed to issue", type: "error" }); }
   };
@@ -436,11 +593,21 @@ export default function InvoiceList({ patientId = null }) {
     };
   }, [report]);
 
+  if (receiptData) {
+    return (
+      <PaymentReceipt
+        invoice={receiptData.invoice}
+        payment={receiptData.payment}
+        onDone={() => setReceiptData(null)}
+      />
+    );
+  }
   if (showForm) return <InvoiceForm patientId={selectedPatientId || patientId} draftStorageKey={`carechrome:draft:invoice-form:${selectedPatientId || patientId || "new"}`} onSuccess={handleFormSuccess} onCancel={() => clearUiState()} />;
   if (viewingInvoice) return (
     <InvoiceViewer
       invoice={viewingInvoice}
       actionParam={actionParam}
+      onPaymentReceipt={handlePaymentReceipt}
       onClose={() => {
         setViewingInvoice(null);
         const nextParams = new URLSearchParams(searchParams);

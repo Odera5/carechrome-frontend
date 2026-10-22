@@ -24,6 +24,10 @@ export default function ProtectedRoute({ children, allowedRoles = [] }) {
     return <Navigate to="/login" state={{ from: readLastVisitedRoute() }} replace />;
   }
 
+  if (user.role === "billing_staff" && !location.pathname.startsWith("/billing")) {
+    return <Navigate to="/billing" replace />;
+  }
+
   const expiredAdminRestricted =
     shouldRestrictAppToBilling(user) &&
     location.pathname !== "/upgrade";
@@ -38,7 +42,7 @@ export default function ProtectedRoute({ children, allowedRoles = [] }) {
   }
 
   if (allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to={user.role === "billing_staff" ? "/billing" : "/dashboard"} replace />;
   }
 
   return children;

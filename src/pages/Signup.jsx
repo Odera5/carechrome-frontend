@@ -27,6 +27,7 @@ const ROLE_LABELS = {
   nurse: "Nurse / Front Desk",
   doctor: "Doctor",
   branch_manager: "Branch Manager",
+  billing_staff: "Billing Staff",
 };
 
 export default function Signup() {
@@ -289,6 +290,7 @@ export default function Signup() {
                          <option value="nurse">Nurse / Front Desk</option>
                          <option value="doctor">Doctor</option>
                          {currentUser?.role === "admin" && enterpriseAccess && <option value="branch_manager">Branch Manager</option>}
+                         {currentUser?.role === "admin" && <option value="billing_staff">Billing Staff</option>}
                        </select>
                     </div>
                  </div>

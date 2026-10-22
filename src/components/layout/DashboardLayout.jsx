@@ -211,6 +211,13 @@ export default function DashboardLayout() {
   const branchMenuRef = useRef(null);
 
   const storedUser = getStoredUserObject() || {};
+  const [profileRoleLabel] = useState(() => {
+    if (storedUser.customRoleTitle) return storedUser.customRoleTitle;
+    if (storedUser.role === "nurse") return "Nurse / Desk";
+    if (storedUser.role === "branch_manager") return "Branch Manager";
+    return storedUser.role || "Role unavailable";
+  });
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [currentUserName, setCurrentUserName] = useState("");
   const [currentUserDob, setCurrentUserDob] = useState("");
   const [currentUserAvatar, setCurrentUserAvatar] = useState("");
@@ -232,8 +239,8 @@ export default function DashboardLayout() {
 
   const user = {
     name: currentUserName || storedUser.name || storedUser.email || "User",
-    role: storedUser.role || "nurse",
-    displayRole: storedUser.customRoleTitle || storedUser.role || "nurse",
+    role: storedUser.role || "",
+    displayRole: profileRoleLabel,
     clinicName: clinicState?.name || storedUser.clinic?.name || "Clinic",
     avatarUrl: currentUserAvatar || storedUser.avatarUrl || "",
   };
@@ -242,6 +249,7 @@ export default function DashboardLayout() {
   const activeBranch = branchState || storedUser.branch || null;
   const isAdmin = user.role === "admin";
   const isBranchManager = user.role === "branch_manager";
+  const isBillingStaff = user.role === "billing_staff";
   const clinicPlan = clinic.plan || "PRO";
   const isPaidTier = ["PRO", "ENTERPRISE"].includes(clinicPlan);
   const subscriptionExpired = isSubscriptionExpired(clinic);
@@ -603,6 +611,8 @@ export default function DashboardLayout() {
   };
 
   const handleLogout = async () => {
+    if (isLoggingOut) return;
+    setIsLoggingOut(true);
     await logoutCurrentUser();
     window.location.href = "/login";
   };
@@ -702,7 +712,7 @@ export default function DashboardLayout() {
                 Main Menu
               </p>
               {!showRestrictedAdminShell && (
-                <NavItem
+                !isBillingStaff && <NavItem
                   icon={Home}
                   label="Dashboard"
                   path="/dashboard"
@@ -760,6 +770,15 @@ export default function DashboardLayout() {
                     />
                   )}
                 </>
+              )}
+              {!showRestrictedAdminShell && isBillingStaff && (
+                <NavItem
+                  icon={CreditCard}
+                  label="Billing"
+                  path="/billing"
+                  location={location}
+                  onNavigate={handleNavClick}
+                />
               )}
             </div>
 
@@ -873,15 +892,17 @@ export default function DashboardLayout() {
                 <p className="text-sm font-semibold text-slate-900 truncate group-hover:text-primary-700 transition-colors">
                   {user.name}
                 </p>
-                <p className="text-xs text-slate-500 capitalize truncate">{user.displayRole === "nurse" && !storedUser.customRoleTitle ? "Nurse / Desk" : user.displayRole === "branch_manager" && !storedUser.customRoleTitle ? "Branch Manager" : user.displayRole}</p>
+                <p className="text-xs text-slate-500 capitalize truncate">{user.displayRole}</p>
               </div>
             </div>
             <Button
               variant="ghost"
               className="w-full justify-start pl-4 text-slate-600 hover:text-red-600 hover:bg-red-50"
               onClick={handleLogout}
+              isLoading={isLoggingOut}
             >
-              <LogOut size={18} className="mr-3" /> Sign Out
+              {!isLoggingOut && <LogOut size={18} className="mr-3" />}
+              {isLoggingOut ? "Signing out…" : "Sign Out"}
             </Button>
           </div>
         </div>
@@ -1274,4 +1295,3 @@ export default function DashboardLayout() {
     </div>
   );
 }
-
