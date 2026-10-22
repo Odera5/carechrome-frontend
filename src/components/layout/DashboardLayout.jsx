@@ -250,6 +250,8 @@ export default function DashboardLayout() {
   const isAdmin = user.role === "admin";
   const isBranchManager = user.role === "branch_manager";
   const isBillingStaff = user.role === "billing_staff";
+  const canAccessBilling =
+    isAdmin || isBillingStaff || Boolean(storedUser.canAccessBilling);
   const clinicPlan = clinic.plan || "PRO";
   const isPaidTier = ["PRO", "ENTERPRISE"].includes(clinicPlan);
   const subscriptionExpired = isSubscriptionExpired(clinic);
@@ -753,15 +755,6 @@ export default function DashboardLayout() {
                     location={location}
                     onNavigate={handleNavClick}
                   />
-                  {isAdmin && (
-                    <NavItem
-                      icon={CreditCard}
-                      label="Billing"
-                      path="/billing"
-                      location={location}
-                      onNavigate={handleNavClick}
-                    />
-                  )}
                   {(isAdmin || isBranchManager) && (
                     <NavItem
                       icon={BarChart3}
@@ -773,7 +766,7 @@ export default function DashboardLayout() {
                   )}
                 </>
               )}
-              {!showRestrictedAdminShell && isBillingStaff && (
+              {!showRestrictedAdminShell && canAccessBilling && (
                 <NavItem
                   icon={CreditCard}
                   label="Billing"

@@ -18,6 +18,7 @@ const initialSignupDraft = {
   password: "",
   role: "nurse",
   customRoleTitle: "",
+  canAccessBilling: false,
   assignedBranchIds: [],
 };
 
@@ -27,7 +28,6 @@ const ROLE_LABELS = {
   nurse: "Nurse / Front Desk",
   doctor: "Doctor",
   branch_manager: "Branch Manager",
-  billing_staff: "Billing Staff",
 };
 
 export default function Signup() {
@@ -37,7 +37,18 @@ export default function Signup() {
     "carechrome:draft:signup",
     initialSignupDraft,
   );
-  const { name, email, password, role, customRoleTitle } = signupDraft;
+  const {
+    name,
+    email,
+    password,
+    customRoleTitle,
+  } = signupDraft;
+  const role =
+    signupDraft.role === "billing_staff" ? "nurse" : signupDraft.role || "nurse";
+  const canAccessBilling =
+    signupDraft.role === "billing_staff"
+      ? true
+      : Boolean(signupDraft.canAccessBilling);
   const [showPassword, setShowPassword] = useState(false);
   const [staff, setStaff] = useState([]);
   const [branches, setBranches] = useState([]);
@@ -46,6 +57,8 @@ export default function Signup() {
   const [busyStaffId, setBusyStaffId] = useState("");
   const [branchEditor, setBranchEditor] = useState(null);
   const [branchSaving, setBranchSaving] = useState(false);
+  const [legacyRoleEditor, setLegacyRoleEditor] = useState(null);
+  const [legacyRoleSaving, setLegacyRoleSaving] = useState(false);
   const [toast, setToast] = useState({ show: false, message: "", type: "" });
   const [searchQuery, setSearchQuery] = useState("");
   const [confirmConfig, setConfirmConfig] = useState(null);
@@ -122,6 +135,7 @@ export default function Signup() {
         password,
         role,
         customRoleTitle,
+        canAccessBilling: currentUser?.role === "admin" && canAccessBilling,
         assignedBranchIds: enterpriseAccess ? signupAssignedBranchIds : (branches[0] ? [branches[0].id] : []),
       });
       showToast("Staff account created. The user must verify their email before they can log in.", "success");
@@ -149,13 +163,58 @@ export default function Signup() {
     const selectedRoleLabel = ROLE_LABELS[role] || "Staff";
     setConfirmConfig({
       title: "Confirm Staff Role",
-      message: `${name} will be created as ${selectedRoleLabel}. This role cannot be changed after account creation. Continue?`,
+      message: `${name} will be created as ${selectedRoleLabel}${canAccessBilling ? " with billing access" : ""}. This role cannot be changed after account creation. Continue?`,
       confirmText: "Continue",
       cancelText: "Cancel",
       confirmLoading: false,
       closeOnConfirm: false,
       onConfirm: submitStaffCreation,
     });
+  };
+
+  const handleBillingAccessChange = async (staffMember) => {
+    if (staffMember.role === "billing_staff") return;
+    const canAccessBilling = !staffMember.canAccessBilling;
+    try {
+      setBusyStaffId(staffMember.id);
+      const response = await api.patch(
+        `/auth/staff/${staffMember.id}/billing-access`,
+        { canAccessBilling },
+      );
+      showToast(response.data?.message || "Billing access updated", "success");
+      fetchStaff();
+    } catch (err) {
+      showToast(
+        err.response?.data?.message || "Failed to update billing access",
+        "error",
+      );
+    } finally {
+      setBusyStaffId("");
+    }
+  };
+
+  const convertLegacyBillingRole = async () => {
+    if (!legacyRoleEditor) return;
+    try {
+      setLegacyRoleSaving(true);
+      await api.patch(
+        `/auth/staff/${legacyRoleEditor.id}/convert-legacy-billing-role`,
+        { role: legacyRoleEditor.role },
+      );
+      showToast(
+        "Account converted; billing access remains enabled.",
+        "success",
+      );
+      setLegacyRoleEditor(null);
+      fetchStaff();
+    } catch (err) {
+      showToast(
+        err.response?.data?.message || "Failed to convert the legacy account",
+        "error",
+      );
+    } finally {
+      setLegacyRoleSaving(false);
+    }
   };
 
   const handleStatusChange = async (staffMember) => {
@@ -290,10 +349,30 @@ export default function Signup() {
                          <option value="nurse">Nurse / Front Desk</option>
                          <option value="doctor">Doctor</option>
                          {currentUser?.role === "admin" && enterpriseAccess && <option value="branch_manager">Branch Manager</option>}
-                         {currentUser?.role === "admin" && <option value="billing_staff">Billing Staff</option>}
                        </select>
                     </div>
                  </div>
+
+                 {currentUser?.role === "admin" && (
+                   <label className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+                     <input
+                       type="checkbox"
+                       checked={Boolean(canAccessBilling)}
+                       onChange={(event) =>
+                         updateSignupDraft({
+                           canAccessBilling: event.target.checked,
+                         })
+                       }
+                       className="mt-0.5"
+                     />
+                     <span>
+                       <span className="block font-semibold">Grant billing access</span>
+                       <span className="mt-1 block text-xs text-slate-500">
+                         Adds billing permissions while keeping this staff member’s selected role and branch access.
+                       </span>
+                     </span>
+                   </label>
+                 )}
 
                  <div className="space-y-1.5">
                     <label className="text-sm font-medium text-slate-700">Custom Job Title <span className="text-slate-400 font-normal">(Optional)</span></label>
@@ -385,7 +464,7 @@ export default function Signup() {
                <div className="overflow-x-auto">
                  <table className="w-full text-sm">
                    <thead className="bg-slate-50 border-b border-slate-200 text-slate-600">
-                     <tr><th className="px-6 py-4 text-left font-semibold">User details</th><th className="px-6 py-4 text-left font-semibold">Role assignment</th>{enterpriseAccess && <th className="px-6 py-4 text-left font-semibold">Assigned branches</th>}<th className="px-6 py-4 text-center font-semibold">System Access</th><th className="px-6 py-4 text-right font-semibold">Actions</th></tr>
+                     <tr><th className="px-6 py-4 text-left font-semibold">User details</th><th className="px-6 py-4 text-left font-semibold">Role assignment</th>{enterpriseAccess && <th className="px-6 py-4 text-left font-semibold">Assigned branches</th>}<th className="px-6 py-4 text-center font-semibold">Billing permission</th><th className="px-6 py-4 text-center font-semibold">System Access</th><th className="px-6 py-4 text-right font-semibold">Actions</th></tr>
                    </thead>
                    <tbody className="divide-y divide-slate-100">
                      <AnimatePresence>
@@ -421,6 +500,22 @@ export default function Signup() {
                                </td>
                              )}
                              <td className="px-6 py-4 text-center">
+                               {member.role === "admin" ? (
+                                 <span className="text-xs text-slate-500">Included with admin role</span>
+                               ) : member.role === "billing_staff" ? (
+                                 <span className="text-xs text-amber-700">Legacy billing-only role</span>
+                               ) : (
+                                 <Button
+                                   variant={member.canAccessBilling ? "primary" : "outline"}
+                                   size="sm"
+                                   onClick={() => handleBillingAccessChange(member)}
+                                   disabled={isBusy || currentUser?.role !== "admin"}
+                                 >
+                                   {member.canAccessBilling ? "Granted" : "Grant access"}
+                                 </Button>
+                               )}
+                             </td>
+                             <td className="px-6 py-4 text-center">
                                 <span className={`inline-flex items-center justify-center w-full max-w-[100px] px-2.5 py-1.5 rounded-md text-xs font-bold uppercase tracking-widest ${member.isActive ? "bg-green-100 text-green-700 border border-green-200" : "bg-red-100 text-red-700 border border-red-200"}`}>
                                    {member.isActive ? "Enabled" : "Suspended"}
                                 </span>
@@ -438,6 +533,23 @@ export default function Signup() {
                                       Branches
                                     </Button>
                                   )}
+                                  {member.role === "billing_staff" &&
+                                    currentUser?.role === "admin" && (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() =>
+                                          setLegacyRoleEditor({
+                                            id: member.id,
+                                            name: member.name,
+                                            role: "nurse",
+                                          })
+                                        }
+                                        disabled={isBusy}
+                                      >
+                                        Convert role
+                                      </Button>
+                                    )}
                                   <Button variant={member.isActive ? "outline" : "primary"} size="sm" onClick={() => handleStatusChange(member)} disabled={isBusy || isCurrentUser} className={member.isActive ? "hover:bg-amber-50 hover:text-amber-700 hover:border-amber-200" : "bg-green-600 hover:bg-green-700 text-white"}>
                                     {isBusy ? "..." : member.isActive ? <Power size={14} className="mr-1" /> : <CheckCircle2 size={14} className="mr-1" />}
                                     {member.isActive ? <span className="hidden sm:inline">Suspend</span> : <span className="hidden sm:inline">Enable</span>}
@@ -501,6 +613,58 @@ export default function Signup() {
               </Button>
               <Button onClick={saveBranchAssignments} isLoading={branchSaving}>
                 Save Branches
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+      {legacyRoleEditor && (
+        <div className="fixed inset-0 z-[180] flex items-center justify-center px-4">
+          <div
+            className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+            onClick={() => !legacyRoleSaving && setLegacyRoleEditor(null)}
+          />
+          <div className="relative z-10 w-full max-w-lg rounded-2xl border border-slate-100 bg-white shadow-xl">
+            <div className="border-b border-slate-100 px-6 py-5">
+              <h3 className="text-lg font-bold text-slate-900">
+                Convert {legacyRoleEditor.name}'s legacy account
+              </h3>
+              <p className="mt-1 text-sm text-slate-500">
+                Choose their primary staff role. Their billing permission and branch assignments will be preserved.
+              </p>
+            </div>
+            <div className="px-6 py-5">
+              <label className="mb-2 block text-sm font-medium text-slate-700">
+                Primary role
+              </label>
+              <select
+                value={legacyRoleEditor.role}
+                onChange={(event) =>
+                  setLegacyRoleEditor((current) => ({
+                    ...current,
+                    role: event.target.value,
+                  }))
+                }
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm"
+              >
+                <option value="nurse">Nurse / Front Desk</option>
+                <option value="doctor">Doctor</option>
+                {enterpriseAccess && (
+                  <option value="branch_manager">Branch Manager</option>
+                )}
+              </select>
+            </div>
+            <div className="flex flex-col-reverse gap-3 border-t border-slate-100 bg-slate-50 px-6 py-4 sm:flex-row sm:justify-end">
+              <Button
+                variant="outline"
+                className="bg-white"
+                onClick={() => setLegacyRoleEditor(null)}
+                disabled={legacyRoleSaving}
+              >
+                Cancel
+              </Button>
+              <Button onClick={convertLegacyBillingRole} isLoading={legacyRoleSaving}>
+                Convert account
               </Button>
             </div>
           </div>

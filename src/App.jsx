@@ -141,7 +141,10 @@ function App() {
               <Route
                 path="/billing"
                 element={
-                  <ProtectedRoute allowedRoles={["admin", "billing_staff"]}>
+                  <ProtectedRoute
+                    allowedRoles={["admin"]}
+                    requiredPermission="canAccessBilling"
+                  >
                     <Billing />
                   </ProtectedRoute>
                 }

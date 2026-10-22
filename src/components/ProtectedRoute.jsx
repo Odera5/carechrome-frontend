@@ -8,7 +8,11 @@ import {
 } from "../utils/authStorage";
 import { shouldRestrictAppToBilling, isSubscriptionExpired } from "../utils/clinicAccess";
 
-export default function ProtectedRoute({ children, allowedRoles = [] }) {
+export default function ProtectedRoute({
+  children,
+  allowedRoles = [],
+  requiredPermission,
+}) {
   const location = useLocation();
   const storedUser = getStoredUser();
   let user = null;
@@ -41,7 +45,17 @@ export default function ProtectedRoute({ children, allowedRoles = [] }) {
     return <Navigate to="/login" replace />;
   }
 
-  if (allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
+  const hasRoleAccess = allowedRoles.includes(user.role);
+  const hasPermission =
+    requiredPermission &&
+    (Boolean(user[requiredPermission]) ||
+      (requiredPermission === "canAccessBilling" &&
+        user.role === "billing_staff"));
+  if (
+    (allowedRoles.length > 0 || requiredPermission) &&
+    !hasRoleAccess &&
+    !hasPermission
+  ) {
     return <Navigate to={user.role === "billing_staff" ? "/billing" : "/dashboard"} replace />;
   }
 
