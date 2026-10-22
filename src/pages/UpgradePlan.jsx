@@ -519,7 +519,7 @@ export default function UpgradePlan() {
 
           <div className="mb-5 flex justify-center items-center">
             <p className="text-slate-600 text-xs font-medium bg-white px-4 py-2 rounded-xl border border-slate-200 text-center leading-relaxed">
-              Billed securely in NGN via Paystack (Debit Cards, Bank Transfer, USSD).
+              Prices are shown in NGN. Payments are processed securely by Paystack.
             </p>
           </div>
           {!paystackBillingAvailable && (
@@ -631,7 +631,7 @@ export default function UpgradePlan() {
                       )}
                     </>
                   ) : (
-                    "Enterprise access is active on this clinic account (Paystack NGN). Branch management is unlocked."
+                    "Enterprise plan active. Branch management is unlocked."
                   )}
                 </div>
 
