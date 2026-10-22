@@ -55,9 +55,12 @@ export default function PendingIntakes() {
     assignedDate: "",
     assignedTime: "",
   });
-  const canRegenerateLink = ["admin", "branch_manager"].includes(currentRole);
   const hasProAccess = hasActiveProAccess(intakeAccess?.clinic || storedUser?.clinic || {});
   const enterpriseAccess = hasEnterpriseAccess(intakeAccess?.clinic || storedUser?.clinic || {});
+  const canManageIntakeAccess =
+    currentRole === "admin" ||
+    (currentRole === "branch_manager" && enterpriseAccess);
+  const canRegenerateLink = canManageIntakeAccess;
   const intakeLink = intakeAccess?.intakePublicToken
     ? `${window.location.origin}/intake/${intakeAccess.clinicId}?access=${encodeURIComponent(intakeAccess.intakePublicToken)}${enterpriseAccess ? `&branchId=${encodeURIComponent(intakeAccess.branch?.id || "")}` : ""}`
     : "";
@@ -423,16 +426,18 @@ export default function PendingIntakes() {
           </div>
 
           <div className="mt-4 flex flex-wrap items-center gap-3">
-            <Button
-              variant={intakeAccess?.intakeEnabled ? "outline" : "primary"}
-              onClick={() => handleToggleIntakeAccess(!intakeAccess?.intakeEnabled)}
-              isLoading={intakeUpdating}
-              disabled={!hasProAccess}
-              className={intakeAccess?.intakeEnabled ? "w-full sm:w-auto bg-white" : "w-full sm:w-auto"}
-            >
-              <Power size={16} className="mr-2" />
-              {intakeAccess?.intakeEnabled ? "Disable Intake" : "Enable Intake"}
-            </Button>
+            {canManageIntakeAccess && (
+              <Button
+                variant={intakeAccess?.intakeEnabled ? "outline" : "primary"}
+                onClick={() => handleToggleIntakeAccess(!intakeAccess?.intakeEnabled)}
+                isLoading={intakeUpdating}
+                disabled={!hasProAccess}
+                className={intakeAccess?.intakeEnabled ? "w-full sm:w-auto bg-white" : "w-full sm:w-auto"}
+              >
+                <Power size={16} className="mr-2" />
+                {intakeAccess?.intakeEnabled ? "Disable Intake" : "Enable Intake"}
+              </Button>
+            )}
             {canRegenerateLink && (
               <Button
                 variant="outline"
@@ -463,10 +468,13 @@ export default function PendingIntakes() {
           </div>
 
           <p className="mt-3 text-xs leading-5 text-slate-400">
-            {enterpriseAccess 
-              ? "Doctors, nurses, and branch managers can enable or disable intake for the current branch. Only admins and branch managers can regenerate the secure link because regeneration revokes the old one immediately."
-              : "Doctors, nurses, and clinic managers can enable or disable intake for the clinic. Only admins and clinic managers can regenerate the secure link because regeneration revokes the old one immediately."
-            }
+            {enterpriseAccess
+              ? canManageIntakeAccess
+                ? "Intake settings apply only to the current branch. Regenerating the link immediately revokes the previous link."
+                : "Only admins and branch managers assigned to this branch can change its intake settings."
+              : canManageIntakeAccess
+                ? "Intake settings apply to the entire clinic. Regenerating the link immediately revokes the previous link."
+                : "Only a clinic admin can change clinic-wide intake settings."}
           </p>
           {!hasProAccess && (
             <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-medium text-amber-800">
