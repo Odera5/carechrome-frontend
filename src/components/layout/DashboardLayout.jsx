@@ -753,13 +753,15 @@ export default function DashboardLayout() {
                     location={location}
                     onNavigate={handleNavClick}
                   />
-                  <NavItem
-                    icon={CreditCard}
-                    label="Billing"
-                    path="/billing"
-                    location={location}
-                    onNavigate={handleNavClick}
-                  />
+                  {isAdmin && (
+                    <NavItem
+                      icon={CreditCard}
+                      label="Billing"
+                      path="/billing"
+                      location={location}
+                      onNavigate={handleNavClick}
+                    />
+                  )}
                   {(isAdmin || isBranchManager) && (
                     <NavItem
                       icon={BarChart3}
