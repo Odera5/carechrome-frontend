@@ -59,6 +59,7 @@ export default function Signup() {
   const [branchSaving, setBranchSaving] = useState(false);
   const [legacyRoleEditor, setLegacyRoleEditor] = useState(null);
   const [legacyRoleSaving, setLegacyRoleSaving] = useState(false);
+  const [roleEditor, setRoleEditor] = useState(null);
   const [toast, setToast] = useState({ show: false, message: "", type: "" });
   const [searchQuery, setSearchQuery] = useState("");
   const [confirmConfig, setConfirmConfig] = useState(null);
@@ -163,7 +164,7 @@ export default function Signup() {
     const selectedRoleLabel = ROLE_LABELS[role] || "Staff";
     setConfirmConfig({
       title: "Confirm Staff Role",
-      message: `${name} will be created as ${selectedRoleLabel}${canAccessBilling ? " with billing access" : ""}. This role cannot be changed after account creation. Continue?`,
+      message: `${name} will be created as ${selectedRoleLabel}${canAccessBilling ? " with billing access" : ""}. An admin can update their role later from Manage Staff. Continue?`,
       confirmText: "Continue",
       cancelText: "Cancel",
       confirmLoading: false,
@@ -226,6 +227,85 @@ export default function Signup() {
       fetchStaff();
     } catch (err) { showToast(err.response?.data?.message || "Failed to update status", "error"); } 
     finally { setBusyStaffId(""); }
+  };
+
+  const openRoleEditor = (member) => {
+    const assignedBranchIds = Array.isArray(member.assignedBranchIds)
+      ? member.assignedBranchIds
+      : [];
+    setRoleEditor({
+      id: member.id,
+      name: member.name,
+      currentRole: member.role,
+      role: member.role,
+      assignedBranchIds:
+        assignedBranchIds.length > 0
+          ? assignedBranchIds
+          : [member.branchId || branches.find((branch) => branch.isPrimary)?.id || branches[0]?.id].filter(Boolean),
+    });
+  };
+
+  const toggleRoleBranch = (branchId) => {
+    setRoleEditor((current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        assignedBranchIds: current.assignedBranchIds.includes(branchId)
+          ? current.assignedBranchIds.filter((id) => id !== branchId)
+          : [...current.assignedBranchIds, branchId],
+      };
+    });
+  };
+
+  const submitRoleChange = async () => {
+    if (!roleEditor) return;
+    if (
+      roleEditor.role !== "admin" &&
+      roleEditor.assignedBranchIds.length === 0
+    ) {
+      setConfirmConfig(null);
+      showToast("Assign at least one branch to this staff account.", "error");
+      return;
+    }
+    try {
+      setBusyStaffId(roleEditor.id);
+      setConfirmConfig((current) =>
+        current ? { ...current, confirmLoading: true } : current,
+      );
+      await api.patch(`/auth/staff/${roleEditor.id}/role`, {
+        role: roleEditor.role,
+        assignedBranchIds: roleEditor.assignedBranchIds,
+      });
+      setRoleEditor(null);
+      setConfirmConfig(null);
+      showToast(
+        "Staff role updated. They must sign in again for the change to take effect.",
+        "success",
+      );
+      fetchStaff();
+    } catch (err) {
+      setConfirmConfig(null);
+      showToast(err.response?.data?.message || "Failed to update staff role", "error");
+    } finally {
+      setBusyStaffId("");
+    }
+  };
+
+  const confirmRoleChange = () => {
+    if (!roleEditor || roleEditor.role === roleEditor.currentRole) return;
+    const promotesToAdmin = roleEditor.role === "admin";
+    setConfirmConfig({
+      title: promotesToAdmin ? "Promote to Admin" : "Confirm Role Change",
+      message: promotesToAdmin
+        ? `${roleEditor.name} will receive full clinic administrator access. Their current sessions will be ended and they must sign in again. Continue?`
+        : `${roleEditor.name}'s role will change from ${ROLE_LABELS[roleEditor.currentRole] || roleEditor.currentRole} to ${ROLE_LABELS[roleEditor.role] || roleEditor.role}. Their sessions will be ended and they must sign in again. Continue?`,
+      confirmText: promotesToAdmin ? "Promote to Admin" : "Change Role",
+      cancelText: "Cancel",
+      confirmLoading: false,
+      closeOnConfirm: false,
+      danger: promotesToAdmin || roleEditor.currentRole === "admin",
+      onConfirm: submitRoleChange,
+    });
   };
 
   const executeDelete = async (staffMember) => {
@@ -471,6 +551,9 @@ export default function Signup() {
                        {filteredStaff.map((member) => {
                          const isCurrentUser = member.id === currentUser?.id;
                          const isBusy = busyStaffId === member.id;
+                         const cannotManageAdmin =
+                           member.role === "admin" &&
+                           !currentUser?.isClinicOwner;
                          
                          return (
                            <MotionTr key={member.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className={`hover:bg-slate-50/50 transition-colors ${!member.isActive ? "bg-slate-50/80" : "bg-white"}`}>
@@ -488,9 +571,16 @@ export default function Signup() {
                                 </div>
                              </td>
                              <td className="px-6 py-4">
-                                <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold capitalize tracking-wider ${member.role === 'admin' ? 'bg-purple-100 text-purple-700' : member.role === 'doctor' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                                  {member.customRoleTitle || (member.role === "nurse" ? "Nurse / Desk" : member.role === "branch_manager" ? "Branch Manager" : member.role)}
-                                </span>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold capitalize tracking-wider ${member.role === 'admin' ? 'bg-purple-100 text-purple-700' : member.role === 'doctor' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                                    {member.customRoleTitle || (member.role === "nurse" ? "Nurse / Desk" : member.role === "branch_manager" ? "Branch Manager" : member.role)}
+                                  </span>
+                                  {member.isClinicOwner && (
+                                    <span className="rounded-md bg-amber-100 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-amber-800">
+                                      Clinic Owner
+                                    </span>
+                                  )}
+                                </div>
                              </td>
                              {enterpriseAccess && (
                                <td className="px-6 py-4">
@@ -533,6 +623,20 @@ export default function Signup() {
                                       Branches
                                     </Button>
                                   )}
+                                  {currentUser?.role === "admin" &&
+                                    member.role !== "billing_staff" &&
+                                    !member.isClinicOwner &&
+                                    (member.role !== "admin" ||
+                                      currentUser?.isClinicOwner) && (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => openRoleEditor(member)}
+                                        disabled={isBusy}
+                                      >
+                                        Change role
+                                      </Button>
+                                    )}
                                   {member.role === "billing_staff" &&
                                     currentUser?.role === "admin" && (
                                       <Button
@@ -550,11 +654,11 @@ export default function Signup() {
                                         Convert role
                                       </Button>
                                     )}
-                                  <Button variant={member.isActive ? "outline" : "primary"} size="sm" onClick={() => handleStatusChange(member)} disabled={isBusy || isCurrentUser} className={member.isActive ? "hover:bg-amber-50 hover:text-amber-700 hover:border-amber-200" : "bg-green-600 hover:bg-green-700 text-white"}>
+                                  <Button variant={member.isActive ? "outline" : "primary"} size="sm" onClick={() => handleStatusChange(member)} disabled={isBusy || isCurrentUser || member.isClinicOwner || cannotManageAdmin} className={member.isActive ? "hover:bg-amber-50 hover:text-amber-700 hover:border-amber-200" : "bg-green-600 hover:bg-green-700 text-white"}>
                                     {isBusy ? "..." : member.isActive ? <Power size={14} className="mr-1" /> : <CheckCircle2 size={14} className="mr-1" />}
                                     {member.isActive ? <span className="hidden sm:inline">Suspend</span> : <span className="hidden sm:inline">Enable</span>}
                                   </Button>
-                                  <Button variant="ghost" size="sm" onClick={() => handleDelete(member)} disabled={isBusy || isCurrentUser} className="text-slate-400 hover:text-red-600 hover:bg-red-50">
+                                  <Button variant="ghost" size="sm" onClick={() => handleDelete(member)} disabled={isBusy || isCurrentUser || member.isClinicOwner || cannotManageAdmin} className="text-slate-400 hover:text-red-600 hover:bg-red-50">
                                     <Trash2 size={16} />
                                   </Button>
                                 </div>
@@ -665,6 +769,101 @@ export default function Signup() {
               </Button>
               <Button onClick={convertLegacyBillingRole} isLoading={legacyRoleSaving}>
                 Convert account
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+      {roleEditor && (
+        <div className="fixed inset-0 z-[180] flex items-center justify-center px-4">
+          <div
+            className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+            onClick={() => setRoleEditor(null)}
+          />
+          <div className="relative z-10 w-full max-w-lg rounded-2xl border border-slate-100 bg-white shadow-xl">
+            <div className="border-b border-slate-100 px-6 py-5">
+              <h3 className="text-lg font-bold text-slate-900">
+                Change role for {roleEditor.name}
+              </h3>
+              <p className="mt-1 text-sm text-slate-500">
+                Role changes are recorded, and the staff member will need to sign in again.
+              </p>
+            </div>
+            <div className="space-y-4 px-6 py-5">
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">
+                  Primary role
+                </label>
+                <select
+                  value={roleEditor.role}
+                  onChange={(event) =>
+                    setRoleEditor((current) => ({
+                      ...current,
+                      role: event.target.value,
+                    }))
+                  }
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm"
+                >
+                  <option value="nurse">Nurse / Front Desk</option>
+                  <option value="doctor">Doctor</option>
+                  {enterpriseAccess && (
+                    <option value="branch_manager">Branch Manager</option>
+                  )}
+                  {currentUser?.isClinicOwner && (
+                    <option value="admin">Admin</option>
+                  )}
+                </select>
+              </div>
+              {roleEditor.role !== "admin" && (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-slate-700">
+                    Assigned branches *
+                  </p>
+                  <div className="max-h-48 space-y-2 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-3">
+                    {branches.filter((branch) => branch.isActive).map((branch) => (
+                      <label
+                        key={branch.id}
+                        className="flex items-center gap-3 rounded-lg bg-white px-3 py-2 text-sm text-slate-700"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={roleEditor.assignedBranchIds.includes(branch.id)}
+                          onChange={() => toggleRoleBranch(branch.id)}
+                        />
+                        <span>{branch.city || branch.name}{branch.area ? ` - ${branch.area}` : ""}</span>
+                      </label>
+                    ))}
+                  </div>
+                  {roleEditor.assignedBranchIds.length === 0 && (
+                    <p className="text-xs text-rose-600">
+                      Select at least one branch before continuing.
+                    </p>
+                  )}
+                </div>
+              )}
+              {roleEditor.role === "admin" && (
+                <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm leading-5 text-amber-900">
+                  Admins receive clinic-wide access. Only the Clinic Owner can promote staff to Admin.
+                </p>
+              )}
+            </div>
+            <div className="flex flex-col-reverse gap-3 border-t border-slate-100 bg-slate-50 px-6 py-4 sm:flex-row sm:justify-end">
+              <Button
+                variant="outline"
+                className="bg-white"
+                onClick={() => setRoleEditor(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={confirmRoleChange}
+                disabled={
+                  roleEditor.role === roleEditor.currentRole ||
+                  (roleEditor.role !== "admin" &&
+                    roleEditor.assignedBranchIds.length === 0)
+                }
+              >
+                Review role change
               </Button>
             </div>
           </div>
