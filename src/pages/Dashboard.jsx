@@ -1,4 +1,4 @@
-import React, { useCallback, useDeferredValue, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { 
@@ -53,6 +53,7 @@ export default function Dashboard() {
   const user = {
     role: storedUser.role || "nurse",
   };
+  const canViewRevenue = storedUser.isClinicOwner || ["admin", "branch_manager"].includes(user.role);
   
   const canViewRecords = ["admin", "branch_manager", "doctor", "nurse"].includes(user.role);
   const canDeletePatients = ["admin", "branch_manager", "doctor", "nurse"].includes(user.role);
@@ -71,7 +72,7 @@ export default function Dashboard() {
     cachedSummary?.waitingRoom || defaultWaitingSummary,
   );
   const [monthlyRevenue, setMonthlyRevenue] = useState(
-    cachedSummary?.billing?.monthlyRevenue || 0,
+    canViewRevenue ? cachedSummary?.billing?.monthlyRevenue || 0 : 0,
   );
   const [trash, setTrash] = useState([]);
   const [directoryState, setDirectoryState] = usePersistentState(
@@ -186,8 +187,10 @@ export default function Dashboard() {
     setAppointmentsToday(summary?.appointments?.today || 0);
     setScheduledAppointments(summary?.appointments?.scheduled || 0);
     setWaitingSummary(summary?.waitingRoom || defaultWaitingSummary);
-    setMonthlyRevenue(summary?.billing?.monthlyRevenue || 0);
-  }, []);
+    setMonthlyRevenue(
+      canViewRevenue ? summary?.billing?.monthlyRevenue || 0 : 0,
+    );
+  }, [canViewRevenue]);
 
   useEffect(() => {
     const unsubscribe = subscribeDashboardSummary((summary) => {
@@ -466,30 +469,6 @@ export default function Dashboard() {
     });
   };
 
-  const executePermanentDelete = async (patientId) => {
-    try {
-      const res = await api.delete(`/patients/${patientId}/permanent`);
-      if (res.status === 200) {
-        fetchPatients();
-        fetchTrash();
-        fetchSummary();
-        showToast("Patient permanently deleted");
-      }
-    } catch (err) {
-      showToast(err.response?.data?.message || "Failed to permanently delete patient", "error");
-    }
-  };
-
-  const handlePermanentDelete = (patientId) => {
-    setConfirmConfig({
-      title: "Delete Permanently",
-      message: "Permanently delete this patient? This action cannot be undone and all associated records will be lost.",
-      confirmText: "Delete Forever",
-      danger: true,
-      onConfirm: () => executePermanentDelete(patientId)
-    });
-  };
-
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="p-4 md:p-6 space-y-8 h-full">
       {toast && <Toast message={toast.message} type={toast.type} duration={3000} onClose={() => setToast(null)} />}
@@ -549,22 +528,24 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex justify-between items-center mt-2">
-                <div>
-                  <p className="text-sm font-medium text-slate-500">Monthly Revenue</p>
-                  <h3 className="text-2xl lg:text-[28px] font-bold text-slate-900 mt-2 tracking-tight whitespace-nowrap">
-                    <span className="text-base text-slate-400 font-medium align-top mr-1">₦</span>
-                    {monthlyRevenue.toLocaleString()}
-                  </h3>
+          {canViewRevenue && (
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex justify-between items-center mt-2">
+                  <div>
+                    <p className="text-sm font-medium text-slate-500">Monthly Revenue</p>
+                    <h3 className="text-2xl lg:text-[28px] font-bold text-slate-900 mt-2 tracking-tight whitespace-nowrap">
+                      <span className="text-base text-slate-400 font-medium align-top mr-1">₦</span>
+                      {monthlyRevenue.toLocaleString()}
+                    </h3>
+                  </div>
+                  <div className="p-3 bg-primary-100 rounded-xl text-primary-600">
+                    <CreditCard size={24} />
+                  </div>
                 </div>
-                <div className="p-3 bg-primary-100 rounded-xl text-primary-600">
-                  <CreditCard size={24} />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
         </div>
       )}
 
