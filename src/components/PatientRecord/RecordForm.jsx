@@ -1160,9 +1160,8 @@ export default function RecordForm({
         </h2>
         <p className="mb-4 text-xs text-amber-800">
           Confirm allergies and medical history with the patient at this visit.
-          Non-empty entries are added to the patient&apos;s current history and
-          retained across visits. From the patient record, mark entries resolved
-          or incorrect when appropriate; do not rely on old entries as current.
+          Any non-empty allergy or comorbidity recorded here will appear in the
+          patient&apos;s important clinical notice and remain visible across visits.
         </p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-1.5 focus-within:text-primary-600 transition-colors">

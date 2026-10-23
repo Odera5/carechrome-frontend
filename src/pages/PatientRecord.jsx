@@ -40,12 +40,6 @@ export default function PatientRecord() {
 
   const [patient, setPatient] = useState(null);
   const [clinicalHistoryEntries, setClinicalHistoryEntries] = useState([]);
-  const [historyDraft, setHistoryDraft] = useState({
-    category: "allergy",
-    value: "",
-    reaction: "",
-  });
-  const [historySaving, setHistorySaving] = useState(false);
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [recordMeta, setRecordMeta] = useState({
@@ -206,80 +200,6 @@ export default function PatientRecord() {
       showToast("Record added successfully!", "success");
       return true;
     } catch (err) { showToast(err.response?.data?.message || "Failed to add record", "error"); return false; } finally { setAddLoading(false); }
-  };
-
-  const addClinicalHistoryEntry = async (entry) => {
-    const value = String(entry?.value || "").trim();
-    if (!value) {
-      showToast("Enter an allergy or medical condition first.", "error");
-      return;
-    }
-    try {
-      setHistorySaving(true);
-      const response = await api.post(`/patients/${id}/clinical-history`, {
-        category: entry.category,
-        value,
-        reaction: entry.reaction || "",
-      });
-      setClinicalHistoryEntries((current) =>
-        [...current, response.data].sort((a, b) =>
-          `${a.status}-${a.category}-${a.createdAt}`.localeCompare(
-            `${b.status}-${b.category}-${b.createdAt}`,
-          ),
-        ),
-      );
-      setHistoryDraft({ category: "allergy", value: "", reaction: "" });
-      showToast("Added to the patient's current medical history.");
-    } catch (error) {
-      showToast(
-        error.response?.data?.message || "Failed to add clinical history.",
-        "error",
-      );
-    } finally {
-      setHistorySaving(false);
-    }
-  };
-
-  const updateClinicalHistoryStatus = async (entry, status) => {
-    try {
-      const response = await api.patch(
-        `/patients/${id}/clinical-history/${entry.id}`,
-        { status },
-      );
-      setClinicalHistoryEntries((current) =>
-        current.map((item) => (item.id === entry.id ? response.data : item)),
-      );
-      showToast(
-        status === "active"
-          ? "Restored to current medical history."
-          : status === "resolved"
-            ? "Marked as resolved; retained in history."
-            : "Marked as entered in error; retained in history.",
-      );
-    } catch (error) {
-      showToast(
-        error.response?.data?.message || "Failed to update clinical history.",
-        "error",
-      );
-    }
-  };
-
-  const reviewClinicalHistory = async () => {
-    try {
-      setHistorySaving(true);
-      const response = await api.post(
-        `/patients/${id}/clinical-history/review`,
-      );
-      setClinicalHistoryEntries(response.data || []);
-      showToast("Active medical history marked as reviewed.");
-    } catch (error) {
-      showToast(
-        error.response?.data?.message || "Failed to review clinical history.",
-        "error",
-      );
-    } finally {
-      setHistorySaving(false);
-    }
   };
 
   const executeDeleteRecord = async (recordId) => {
@@ -510,240 +430,33 @@ export default function PatientRecord() {
         )}
       </div>
 
-      <section
-        aria-labelledby="clinical-history-summary-title"
-        className="rounded-2xl border border-amber-300 bg-amber-50 p-5 shadow-sm"
-      >
-        <div className="flex items-start gap-3">
-          <AlertTriangle size={22} className="mt-0.5 shrink-0 text-amber-700" />
-          <div className="min-w-0 flex-1">
-            <h3 id="clinical-history-summary-title" className="text-base font-bold text-amber-950">
-              Current allergies and medical history
-            </h3>
-            <p className="mt-1 text-sm text-amber-900">
-              This list persists across visits. Confirm it with the patient and
-              update it when information changes. Resolved or incorrect entries
-              remain in history.
-            </p>
-            <div className="mt-4 space-y-3">
-              {clinicalHistoryEntries.length === 0 ? (
-                <div className="rounded-xl border border-amber-200 bg-white p-4 text-sm text-slate-600">
-                  No current entries have been added. A blank list does not mean none.
-                </div>
-              ) : (
-                clinicalHistoryEntries.map((entry) => (
-                  <div key={entry.id} className="rounded-xl border border-slate-200 bg-white p-4">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          {entry.category === "allergy" ? (
-                            <AlertTriangle size={16} className="text-rose-700" />
-                          ) : (
-                            <HeartPulse size={16} className="text-orange-700" />
-                          )}
-                          <span className="text-xs font-bold uppercase tracking-wide text-slate-600">
-                            {entry.category === "allergy" ? "Allergy" : "Condition"}
-                          </span>
-                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold capitalize text-slate-700">
-                            {entry.status === "entered_in_error" ? "Entered in error" : entry.status}
-                          </span>
-                        </div>
-                        <p className="mt-2 whitespace-pre-wrap break-words text-sm font-semibold text-slate-900">
-                          {entry.value}
-                        </p>
-                        {entry.category === "allergy" && entry.reaction && (
-                          <p className="mt-1 whitespace-pre-wrap break-words text-sm text-slate-700">
-                            Reaction: {entry.reaction}
-                          </p>
-                        )}
-                        <p className="mt-2 text-xs text-slate-500">
-                          Added {new Date(entry.createdAt).toLocaleDateString()}
-                          {entry.recordedBy?.name ? ` by ${entry.recordedBy.name}` : ""}
-                          {entry.lastReviewedAt
-                            ? ` · Reviewed ${new Date(entry.lastReviewedAt).toLocaleDateString()}${entry.reviewedBy?.name ? ` by ${entry.reviewedBy.name}` : ""}`
-                            : ""}
-                        </p>
-                      </div>
-                      {canManageRecords && (
-                        <div className="flex shrink-0 gap-2">
-                          {entry.status === "active" ? (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => updateClinicalHistoryStatus(entry, "resolved")}
-                            >
-                              Mark resolved
-                            </Button>
-                          ) : (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => updateClinicalHistoryStatus(entry, "active")}
-                            >
-                              Restore
-                            </Button>
-                          )}
-                          {entry.status !== "entered_in_error" && (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => updateClinicalHistoryStatus(entry, "entered_in_error")}
-                            >
-                              Incorrect
-                            </Button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-            {canManageRecords && (
-              <>
-                <div className="mt-4 grid gap-3 rounded-xl border border-amber-200 bg-white p-4 md:grid-cols-3">
-                  <label className="text-xs font-semibold text-slate-700">
-                    Entry type
-                    <select
-                      value={historyDraft.category}
-                      onChange={(event) => setHistoryDraft((current) => ({
-                        ...current,
-                        category: event.target.value,
-                      }))}
-                      className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                    >
-                      <option value="allergy">Allergy</option>
-                      <option value="comorbidity">Medical condition</option>
-                    </select>
-                  </label>
-                  <label className="text-xs font-semibold text-slate-700">
-                    {historyDraft.category === "allergy" ? "Allergen / medication" : "Condition"}
-                    <input
-                      value={historyDraft.value}
-                      onChange={(event) => setHistoryDraft((current) => ({
-                        ...current,
-                        value: event.target.value,
-                      }))}
-                      maxLength={500}
-                      placeholder={historyDraft.category === "allergy" ? "e.g. Aspirin" : "e.g. Diabetes"}
-                      className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                    />
-                  </label>
-                  {historyDraft.category === "allergy" ? (
-                    <label className="text-xs font-semibold text-slate-700">
-                      Reaction (if known)
-                      <input
-                        value={historyDraft.reaction}
-                        onChange={(event) => setHistoryDraft((current) => ({
-                          ...current,
-                          reaction: event.target.value,
-                        }))}
-                        maxLength={500}
-                        placeholder="e.g. Rash, swelling"
-                        className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                      />
-                    </label>
-                  ) : (
-                    <p className="self-end text-xs text-slate-500">
-                      Add each condition separately so it can be reviewed or resolved independently.
-                    </p>
-                  )}
-                  <div className="md:col-span-3">
-                    <Button
-                      type="button"
-                      size="sm"
-                      disabled={historySaving || !historyDraft.value.trim()}
-                      onClick={() => addClinicalHistoryEntry(historyDraft)}
-                    >
-                      Add to current history
-                    </Button>
-                  </div>
-                </div>
-                {clinicalHistoryEntries.some((entry) => entry.status === "active") && (
-                  <div className="mt-3">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      disabled={historySaving}
-                      onClick={reviewClinicalHistory}
-                    >
-                      Confirmed with patient - mark reviewed today
-                    </Button>
-                  </div>
-                )}
-              </>
-            )}
-            {(patient.clinicalHistorySummary?.allergies ||
-              patient.clinicalHistorySummary?.comorbidities) && (
-              <details className="mt-4 rounded-xl border border-amber-200 bg-white p-4">
-                <summary className="cursor-pointer text-sm font-semibold text-amber-950">
-                  Prior visit notes - not yet confirmed in the current list
-                </summary>
-                <p className="mt-2 text-xs text-slate-600">
-                  Review these historical free-text notes with the patient before adding them to the current list.
+      {clinicalHistoryEntries.length > 0 && (
+        <section
+          aria-label="Important clinical notice"
+          className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3"
+        >
+          <h3 className="text-sm font-bold text-amber-950">
+            Important clinical notice
+          </h3>
+          <div className="mt-2 space-y-1 text-sm text-slate-800">
+            {["allergy", "comorbidity"].map((category) => {
+              const values = clinicalHistoryEntries
+                .filter((entry) => entry.category === category)
+                .map((entry) => entry.value);
+              if (!values.length) return null;
+
+              return (
+                <p key={category} className="break-words">
+                  <span className="font-semibold">
+                    {category === "allergy" ? "Allergy" : "Comorbidity"}:
+                  </span>{" "}
+                  {values.join("; ")}
                 </p>
-                <div className="mt-3 grid gap-3 md:grid-cols-2">
-                  {patient.clinicalHistorySummary?.allergies && (
-                    <div className="rounded-lg border border-rose-100 p-3">
-                      <p className="text-xs font-bold uppercase text-rose-800">Allergy note</p>
-                      <p className="mt-1 whitespace-pre-wrap text-sm text-slate-800">
-                        {patient.clinicalHistorySummary.allergies.value}
-                      </p>
-                      <p className="mt-1 text-xs text-slate-500">
-                        {new Date(patient.clinicalHistorySummary.allergies.recordedAt).toLocaleDateString()}
-                      </p>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="mt-2"
-                        disabled={!canManageRecords || historySaving}
-                        onClick={() => addClinicalHistoryEntry({
-                          category: "allergy",
-                          value: patient.clinicalHistorySummary.allergies.value,
-                        })}
-                      >
-                        Add prior note to current list
-                      </Button>
-                    </div>
-                  )}
-                  {patient.clinicalHistorySummary?.comorbidities && (
-                    <div className="rounded-lg border border-orange-100 p-3">
-                      <p className="text-xs font-bold uppercase text-orange-800">Medical history note</p>
-                      <p className="mt-1 whitespace-pre-wrap text-sm text-slate-800">
-                        {patient.clinicalHistorySummary.comorbidities.value}
-                      </p>
-                      <p className="mt-1 text-xs text-slate-500">
-                        {new Date(patient.clinicalHistorySummary.comorbidities.recordedAt).toLocaleDateString()}
-                      </p>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="mt-2"
-                        disabled={!canManageRecords || historySaving}
-                        onClick={() => addClinicalHistoryEntry({
-                          category: "comorbidity",
-                          value: patient.clinicalHistorySummary.comorbidities.value,
-                        })}
-                      >
-                        Add prior note to current list
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              </details>
-            )}
-            <p className="mt-3 text-xs font-medium text-amber-900">
-              A blank list does not mean none. Document “no known allergies” only after confirming with the patient.
-            </p>
+              );
+            })}
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       <div className="flex justify-center md:justify-start gap-2 border-b border-slate-200 mt-6">
          <button onClick={() => setIsTrashView(false)} className={`py-3 px-6 font-bold text-sm border-b-2 transition-colors ${!isTrashView ? 'border-primary-500 text-primary-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>Active Records</button>
