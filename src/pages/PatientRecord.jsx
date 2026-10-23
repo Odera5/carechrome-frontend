@@ -442,7 +442,23 @@ export default function PatientRecord() {
             {["allergy", "comorbidity"].map((category) => {
               const values = clinicalHistoryEntries
                 .filter((entry) => entry.category === category)
-                .map((entry) => entry.value);
+                .flatMap((entry) =>
+                  entry.value
+                    .split(/[;,\n]+/)
+                    .map((value) =>
+                      value
+                        .trim()
+                        .replace(/^allergic\s+to\s+/i, ""),
+                    )
+                    .filter(Boolean),
+                )
+                .filter(
+                  (value, index, entries) =>
+                    entries.findIndex(
+                      (entry) =>
+                        entry.toLocaleLowerCase() === value.toLocaleLowerCase(),
+                    ) === index,
+                );
               if (!values.length) return null;
 
               return (
@@ -450,7 +466,7 @@ export default function PatientRecord() {
                   <span className="font-semibold">
                     {category === "allergy" ? "Allergy" : "Comorbidity"}:
                   </span>{" "}
-                  {values.join("; ")}
+                  {values.join(", ")}
                 </p>
               );
             })}
