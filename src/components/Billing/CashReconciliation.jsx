@@ -24,9 +24,17 @@ const formatVariance = (amount) => {
   return `${value > 0 ? "+" : ""}${formatCurrency(value)}`;
 };
 
-export default function CashReconciliation() {
+const formatSubmittedAt = (date, timeZone) =>
+  new Intl.DateTimeFormat("en-GB", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone,
+  }).format(new Date(date));
+
+export default function CashReconciliation({ reviewerOnly = false }) {
   const currentUser = getStoredUserObject() || {};
-  const canReview = currentUser.role === "admin";
+  const canReview = ["admin", "branch_manager"].includes(currentUser.role);
+  const canSubmit = !reviewerOnly;
   const [businessDate, setBusinessDate] = useState(localDate);
   const [timeZone] = useState(
     () => Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
@@ -42,7 +50,11 @@ export default function CashReconciliation() {
   const fetchClosings = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await api.get("/invoices/cash-reconciliations");
+      const response = await api.get(
+        reviewerOnly
+          ? "/cash-reconciliations"
+          : "/invoices/cash-reconciliations",
+      );
       setClosings(response.data?.data || []);
     } catch (error) {
       setToast({
@@ -53,7 +65,7 @@ export default function CashReconciliation() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [reviewerOnly]);
 
   useEffect(() => {
     fetchClosings();
@@ -108,7 +120,7 @@ export default function CashReconciliation() {
     try {
       setSaving(true);
       await api.patch(
-        `/invoices/cash-reconciliations/${closing.id}/review`,
+        `${reviewerOnly ? "/cash-reconciliations" : "/invoices/cash-reconciliations"}/${closing.id}/review`,
         { status, reviewerNotes: reviewerNotesValue },
       );
       setToast({
@@ -140,11 +152,13 @@ export default function CashReconciliation() {
           <AlertTriangle size={18} /> Independent cash close
         </p>
         <p className="mt-2 leading-6">
-          Expected cash is calculated from recorded cash payments and reversals for the selected branch and local business day. Count the physical cash independently. An admin must review this submission; a submitter cannot approve their own close.
+          {reviewerOnly
+            ? "Review pending cash closes for your assigned branch. Verify the reported count and notes; you cannot review a close you submitted."
+            : "Expected cash is calculated from recorded cash payments and reversals for the selected branch and local business day. Count the physical cash independently. An admin or assigned branch manager must review each close, and submitters cannot review their own."}
         </p>
       </div>
 
-      <form
+      {canSubmit && <form
         onSubmit={submitClose}
         className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm md:grid-cols-2"
       >
@@ -186,7 +200,7 @@ export default function CashReconciliation() {
             Submit Cash Close
           </Button>
         </div>
-      </form>
+      </form>}
 
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="flex items-center justify-between border-b border-slate-100 p-5">
@@ -215,7 +229,9 @@ export default function CashReconciliation() {
                       {closing.businessDate} · {closing.branch?.city || closing.branch?.name || "Branch"}
                     </p>
                     <p className="mt-1 text-xs text-slate-500">
-                      Submitted by {closing.submittedBy?.name || "Former staff"} · {closing.timezone}
+                      Submitted by {closing.submittedBy?.name || "Former staff"} ·{" "}
+                      {formatSubmittedAt(closing.submittedAt, closing.timezone)} (
+                      {closing.timezone})
                     </p>
                   </div>
                   <span className={`rounded-full px-3 py-1 text-xs font-bold uppercase ${
@@ -243,7 +259,9 @@ export default function CashReconciliation() {
                   </p>
                 )}
 
-                {canReview && closing.status === "pending" && (
+                {canReview &&
+                  closing.status === "pending" &&
+                  closing.submittedBy?.id !== currentUser.id && (
                   <div className="flex flex-col gap-3 rounded-xl bg-slate-50 p-4 sm:flex-row">
                     <Input
                       label="Independent review notes"
@@ -277,6 +295,13 @@ export default function CashReconciliation() {
                     </div>
                   </div>
                 )}
+                {canReview &&
+                  closing.status === "pending" &&
+                  closing.submittedBy?.id === currentUser.id && (
+                    <p className="text-sm text-amber-800">
+                      You submitted this close. Another admin or assigned branch manager must review it.
+                    </p>
+                  )}
               </article>
             ))}
           </div>

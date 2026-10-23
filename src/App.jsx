@@ -54,6 +54,7 @@ const RegisterPatient = lazyWithRetry(() => import("./pages/RegisterPatient"));
 const PatientRecord = lazyWithRetry(() => import("./pages/PatientRecord"));
 const Appointments = lazyWithRetry(() => import("./pages/Appointments"));
 const Billing = lazyWithRetry(() => import("./pages/Billing"));
+const CashReconciliation = lazyWithRetry(() => import("./components/Billing/CashReconciliation"));
 const WaitingRoom = lazyWithRetry(() => import("./pages/WaitingRoom"));
 const Support = lazyWithRetry(() => import("./pages/Support"));
 const UpgradePlan = lazyWithRetry(() => import("./pages/UpgradePlan"));
@@ -146,6 +147,14 @@ function App() {
                     requiredPermission="canAccessBilling"
                   >
                     <Billing />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/cash-reconciliation"
+                element={
+                  <ProtectedRoute allowedRoles={["branch_manager"]}>
+                    <CashReconciliation reviewerOnly />
                   </ProtectedRoute>
                 }
               />

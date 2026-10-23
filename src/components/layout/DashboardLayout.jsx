@@ -637,6 +637,8 @@ export default function DashboardLayout() {
   else if (location.pathname.includes("/waiting-room"))
     headerTitle = "Waiting Room";
   else if (location.pathname.includes("/billing")) headerTitle = "Billing";
+  else if (location.pathname.includes("/cash-reconciliation"))
+    headerTitle = "Cash Reconciliation Review";
   else if (location.pathname.includes("/signup")) headerTitle = "Manage Staff";
   else if (location.pathname.includes("/clinic-settings"))
     headerTitle = "Clinic Settings";
@@ -789,6 +791,15 @@ export default function DashboardLayout() {
                   location={location}
                   onNavigate={handleNavClick}
                 />
+                {isBranchManager && (
+                  <NavItem
+                    icon={CreditCard}
+                    label="Cash Reconciliation"
+                    path="/cash-reconciliation"
+                    location={location}
+                    onNavigate={handleNavClick}
+                  />
+                )}
                 {(isAdmin || isBranchManager) && (
                   <>
                     <NavItem
