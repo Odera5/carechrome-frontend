@@ -1158,6 +1158,12 @@ export default function RecordForm({
         <h2 className="font-bold mb-4 text-lg text-slate-900 border-b border-slate-100 pb-2 flex items-center">
           Case History
         </h2>
+        <p className="mb-4 text-xs text-amber-800">
+          Confirm allergies and medical history with the patient at this visit.
+          Non-empty entries are added to the patient&apos;s current history and
+          retained across visits. From the patient record, mark entries resolved
+          or incorrect when appropriate; do not rely on old entries as current.
+        </p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-1.5 focus-within:text-primary-600 transition-colors">
             <div className="flex justify-between items-center">
@@ -1215,7 +1221,7 @@ export default function RecordForm({
               value={recordData.comorbidities || ""}
               onChange={handleChange}
               rows={2}
-              placeholder="Hypertension, Diabetes, Asthma, etc."
+              placeholder="e.g. Hypertension, Diabetes, Asthma, or No known comorbidities"
               className="w-full rounded-xl border border-slate-200 p-3 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 shadow-sm resize-none transition-shadow"
             />
           </div>
@@ -1240,7 +1246,7 @@ export default function RecordForm({
               value={recordData.allergies || ""}
               onChange={handleChange}
               rows={2}
-              placeholder="Penicillin, NSAIDs, Latex, etc. (Leave blank if none known)"
+              placeholder="e.g. Penicillin (rash), NSAIDs, Latex, or No known allergies"
               className="w-full rounded-xl border border-slate-200 p-3 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 shadow-sm resize-none transition-shadow"
             />
           </div>
