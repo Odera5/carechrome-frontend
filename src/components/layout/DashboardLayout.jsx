@@ -198,6 +198,7 @@ export default function DashboardLayout() {
   const [pendingIntakesCount, setPendingIntakesCount] = useState(
     cachedSummary?.intakes?.pending || 0,
   );
+  const [pendingCashReviewsCount, setPendingCashReviewsCount] = useState(0);
   const [showTrialBanner, setShowTrialBanner] = useState(false);
   const [clinicState, setClinicState] = useState(null);
   const [branchState, setBranchState] = useState(() => {
@@ -251,6 +252,33 @@ export default function DashboardLayout() {
   const isAdmin = user.role === "admin";
   const isBranchManager = user.role === "branch_manager";
   const isBillingStaff = user.role === "billing_staff";
+  useEffect(() => {
+    if (!isAdmin && !isBranchManager) {
+      setPendingCashReviewsCount(0);
+      return undefined;
+    }
+    let isMounted = true;
+    const fetchPendingCashReviews = async () => {
+      try {
+        const response = await api.get("/cash-reconciliations/pending-count");
+        if (isMounted) {
+          setPendingCashReviewsCount(Number(response.data?.count) || 0);
+        }
+      } catch (error) {
+        console.error("Failed to load pending cash reconciliation count:", error);
+      }
+    };
+    fetchPendingCashReviews();
+    const intervalId = window.setInterval(fetchPendingCashReviews, 60000);
+    window.addEventListener("focus", fetchPendingCashReviews);
+    window.addEventListener("cash-reconciliation-updated", fetchPendingCashReviews);
+    return () => {
+      isMounted = false;
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", fetchPendingCashReviews);
+      window.removeEventListener("cash-reconciliation-updated", fetchPendingCashReviews);
+    };
+  }, [activeBranch?.id, isAdmin, isBranchManager]);
   const canAccessBilling =
     isAdmin || isBillingStaff || Boolean(storedUser.canAccessBilling);
   const clinicPlan = clinic.plan || "PRO";
@@ -792,11 +820,12 @@ export default function DashboardLayout() {
                   location={location}
                   onNavigate={handleNavClick}
                 />
-                {isBranchManager && (
+                {(isAdmin || isBranchManager) && (
                   <NavItem
                     icon={CreditCard}
                     label="Cash Reconciliation"
                     path="/cash-reconciliation"
+                    badge={pendingCashReviewsCount}
                     location={location}
                     onNavigate={handleNavClick}
                   />

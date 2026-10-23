@@ -153,7 +153,7 @@ function App() {
               <Route
                 path="/cash-reconciliation"
                 element={
-                  <ProtectedRoute allowedRoles={["branch_manager"]}>
+                  <ProtectedRoute allowedRoles={["admin", "branch_manager"]}>
                     <CashReconciliation reviewerOnly />
                   </ProtectedRoute>
                 }
