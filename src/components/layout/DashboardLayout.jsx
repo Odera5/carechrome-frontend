@@ -212,6 +212,7 @@ export default function DashboardLayout() {
 
   const storedUser = getStoredUserObject() || {};
   const [profileRoleLabel] = useState(() => {
+    if (storedUser.isClinicOwner && storedUser.role === "admin") return "Clinic Owner";
     if (storedUser.customRoleTitle) return storedUser.customRoleTitle;
     if (storedUser.role === "nurse") return "Nurse / Desk";
     if (storedUser.role === "branch_manager") return "Branch Manager";

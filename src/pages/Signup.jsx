@@ -572,14 +572,9 @@ export default function Signup() {
                              </td>
                              <td className="px-6 py-4">
                                 <div className="flex flex-wrap items-center gap-2">
-                                  <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold capitalize tracking-wider ${member.role === 'admin' ? 'bg-purple-100 text-purple-700' : member.role === 'doctor' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                                    {member.customRoleTitle || (member.role === "nurse" ? "Nurse / Desk" : member.role === "branch_manager" ? "Branch Manager" : member.role)}
+                                  <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold capitalize tracking-wider ${member.isClinicOwner ? 'bg-amber-100 text-amber-800' : member.role === 'admin' ? 'bg-purple-100 text-purple-700' : member.role === 'doctor' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                                    {member.isClinicOwner ? "Clinic Owner" : member.customRoleTitle || (member.role === "nurse" ? "Nurse / Desk" : member.role === "branch_manager" ? "Branch Manager" : member.role)}
                                   </span>
-                                  {member.isClinicOwner && (
-                                    <span className="rounded-md bg-amber-100 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-amber-800">
-                                      Clinic Owner
-                                    </span>
-                                  )}
                                 </div>
                              </td>
                              {enterpriseAccess && (
