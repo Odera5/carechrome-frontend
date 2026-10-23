@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Check, ClipboardCheck, RefreshCw, AlertTriangle, ChevronDown } from "lucide-react";
 import api from "../../services/api";
 import Button from "../ui/Button";
@@ -53,8 +53,10 @@ export default function CashReconciliation({ reviewerOnly = false }) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null);
+  const fetchSequence = useRef(0);
 
   const fetchClosings = useCallback(async () => {
+    const requestSequence = ++fetchSequence.current;
     try {
       setLoading(true);
       const response = await api.get(
@@ -71,19 +73,23 @@ export default function CashReconciliation({ reviewerOnly = false }) {
           },
         },
       );
+      if (requestSequence !== fetchSequence.current) return;
       setClosings(response.data?.data || []);
       setPagination((current) => ({
         ...current,
         ...(response.data?.pagination || {}),
       }));
     } catch (error) {
+      if (requestSequence !== fetchSequence.current) return;
       setToast({
         message:
           error.response?.data?.message || "Failed to load cash reconciliation history.",
         type: "error",
       });
     } finally {
-      setLoading(false);
+      if (requestSequence === fetchSequence.current) {
+        setLoading(false);
+      }
     }
   }, [activeStatus, fromDate, pagination.page, reviewerOnly, toDate]);
 
@@ -225,6 +231,8 @@ export default function CashReconciliation({ reviewerOnly = false }) {
   };
 
   const changeStatus = (status) => {
+    fetchSequence.current += 1;
+    setClosings([]);
     setActiveStatus(status);
     setPagination((current) => ({ ...current, page: 1 }));
   };
