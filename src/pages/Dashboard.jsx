@@ -34,7 +34,7 @@ const formatLocalDateKey = (value = new Date()) => {
   return `${year}-${month}-${day}`;
 };
 
-const defaultWaitingSummary = { waiting: 0, called: 0, in_consultation: 0, completed: 0, total: 0 };
+const defaultWaitingSummary = { waiting: 0, called: 0, in_consultation: 0, completed: 0, total: 0, active: 0 };
 
 const shouldSuppressDashboardError = (error) => {
   const status = error?.response?.status;
@@ -519,7 +519,7 @@ export default function Dashboard() {
               <div className="flex justify-between items-center mt-2">
                 <div>
                   <p className="text-sm font-medium text-slate-500">Waiting Room</p>
-                  <h3 className="text-3xl font-bold text-slate-900 mt-2">{waitingSummary.waiting}</h3>
+                  <h3 className="text-3xl font-bold text-slate-900 mt-2">{waitingSummary.active ?? (waitingSummary.waiting + waitingSummary.called + waitingSummary.in_consultation)}</h3>
                 </div>
                 <div className="p-3 bg-amber-100 rounded-xl text-amber-600">
                   <Activity size={24} />
