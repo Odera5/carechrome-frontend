@@ -1,10 +1,9 @@
-import React, { useCallback, useDeferredValue, useEffect, useState } from "react";
+import React, { useCallback, useDeferredValue, useEffect, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { 
   Users, Calendar, Activity, CreditCard, Search, RefreshCw, ArchiveRestore, Trash2, Upload, Download, Lock, Globe, AlertCircle
 } from "lucide-react";
-import Papa from "papaparse";
 import CsvImportModal from "../components/Patients/CsvImportModal";
 import api from "../services/api";
 import Toast from "../components/Toast";
@@ -81,6 +80,7 @@ export default function Dashboard() {
   );
   const { searchQuery, sortConfig, currentPage, globalSearch } = directoryState;
   const [loading, setLoading] = useState(true);
+  const directoryRequestId = useRef(0);
   const [toast, setToast] = useState(null);
   const [currentDay, setCurrentDay] = useState(formatLocalDateKey());
   const [showImportModal, setShowImportModal] = useState(false);
@@ -88,8 +88,13 @@ export default function Dashboard() {
   const [confirmConfig, setConfirmConfig] = useState(null);
   const [patientTotal, setPatientTotal] = useState(0);
   const [patientTotalPages, setPatientTotalPages] = useState(1);
+  const [patientNextCursor, setPatientNextCursor] = useState(null);
+  const [patientHasMore, setPatientHasMore] = useState(false);
   const [trashTotal, setTrashTotal] = useState(0);
   const [trashTotalPages, setTrashTotalPages] = useState(1);
+  const [trashNextCursor, setTrashNextCursor] = useState(null);
+  const [trashHasMore, setTrashHasMore] = useState(false);
+  const [pageCursors, setPageCursors] = useState([null]);
 
   const [showBirthdayModal, setShowBirthdayModal] = useState(false);
 
@@ -201,33 +206,17 @@ export default function Dashboard() {
     }
     const runExport = async () => {
       try {
-        const res = await api.get("/patients");
-        const exportPatients = Array.isArray(res.data) ? res.data : [];
-
-        if (exportPatients.length === 0) {
-          showToast("No patients to export", "error");
-          return;
-        }
-
-        const csvData = exportPatients.map((p) => ({
-          Name: p.name,
-          Age: p.age,
-          Gender: p.gender,
-          Phone: p.phone ? `\t${p.phone}` : "",
-          Email: p.email,
-          Address: p.address,
-          CardNumber: p.cardNumber,
-          CreatedAt: new Date(p.createdAt).toLocaleString()
-        }));
-
-        const csv = Papa.unparse(csvData);
-        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+        const res = await api.get("/patients/export.csv", {
+          responseType: "blob",
+        });
+        const blob = res.data;
         const link = document.createElement("a");
         link.href = URL.createObjectURL(blob);
         link.setAttribute("download", `patients_export_${new Date().getTime()}.csv`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+        URL.revokeObjectURL(link.href);
         showToast("Export successful!");
       } catch (err) {
         console.error(err);
@@ -270,18 +259,21 @@ export default function Dashboard() {
   }, [applySummary]);
 
   const fetchPatients = useCallback(async () => {
+    const requestId = ++directoryRequestId.current;
     try {
       setLoading(true);
       const res = await api.get("/patients", {
         params: {
           page: currentPage,
           limit: PATIENTS_PER_PAGE,
+          cursor: pageCursors[currentPage - 1] || undefined,
           search: debouncedSearchQuery || undefined,
           sortBy: sortConfig.key || undefined,
           sortDirection: sortConfig.key ? sortConfig.direction : "desc",
           global: globalSearch || undefined,
         },
       });
+      if (requestId !== directoryRequestId.current) return;
       const pageData = Array.isArray(res.data?.data)
         ? res.data.data
         : Array.isArray(res.data)
@@ -291,30 +283,38 @@ export default function Dashboard() {
       setPatients(pageData.filter((p) => p && !p.isDeleted));
       setPatientTotal(Number(res.data?.total) || pageData.length);
       setPatientTotalPages(Number(res.data?.totalPages) || 1);
+      setPatientNextCursor(res.data?.nextCursor || null);
+      setPatientHasMore(Boolean(res.data?.hasMore));
     } catch (err) {
+      if (requestId !== directoryRequestId.current) return;
       console.error(err);
       setPatients([]);
       setPatientTotal(0);
       setPatientTotalPages(1);
+      setPatientNextCursor(null);
+      setPatientHasMore(false);
       showToast("Failed to load patients", "error");
     } finally {
-      setLoading(false);
+      if (requestId === directoryRequestId.current) setLoading(false);
     }
-  }, [currentPage, debouncedSearchQuery, sortConfig.direction, sortConfig.key, globalSearch]);
+  }, [currentPage, debouncedSearchQuery, globalSearch, pageCursors, sortConfig.direction, sortConfig.key]);
 
   const fetchTrash = useCallback(async () => {
     if (user.role !== "admin") return;
+    const requestId = ++directoryRequestId.current;
     try {
       setLoading(true);
       const res = await api.get("/patients/trash/all", {
         params: {
           page: currentPage,
           limit: PATIENTS_PER_PAGE,
+          cursor: pageCursors[currentPage - 1] || undefined,
           search: debouncedSearchQuery || undefined,
           sortBy: sortConfig.key || undefined,
           sortDirection: sortConfig.key ? sortConfig.direction : "desc",
         },
       });
+      if (requestId !== directoryRequestId.current) return;
       const pageData = Array.isArray(res.data?.data)
         ? res.data.data
         : Array.isArray(res.data)
@@ -324,18 +324,24 @@ export default function Dashboard() {
       setTrash(pageData.map((p) => ({ ...p, name: p.name || p.fullName || "Unknown" })));
       setTrashTotal(Number(res.data?.total) || pageData.length);
       setTrashTotalPages(Number(res.data?.totalPages) || 1);
+      setTrashNextCursor(res.data?.nextCursor || null);
+      setTrashHasMore(Boolean(res.data?.hasMore));
     } catch (err) {
+      if (requestId !== directoryRequestId.current) return;
       console.error(err);
       setTrash([]);
       setTrashTotal(0);
       setTrashTotalPages(1);
+      setTrashNextCursor(null);
+      setTrashHasMore(false);
       if (!shouldSuppressDashboardError(err)) showToast("Failed to load trash", "error");
     } finally {
-      setLoading(false);
+      if (requestId === directoryRequestId.current) setLoading(false);
     }
   }, [
     currentPage,
     debouncedSearchQuery,
+    pageCursors,
     sortConfig.direction,
     sortConfig.key,
     user.role,
@@ -378,10 +384,34 @@ export default function Dashboard() {
   const pageStartIndex = (currentPageSafe - 1) * PATIENTS_PER_PAGE;
   const paginatedPatients = activeList;
   const totalResults = showTrash ? trashTotal : patientTotal;
+  const hasMorePages = showTrash ? trashHasMore : patientHasMore;
+  const nextPageCursor = showTrash ? trashNextCursor : patientNextCursor;
 
   useEffect(() => {
     setDirectoryState((current) => ({ ...current, currentPage: 1 }));
-  }, [debouncedSearchQuery, setDirectoryState, showTrash, sortConfig]);
+    setPageCursors([null]);
+  }, [debouncedSearchQuery, globalSearch, setDirectoryState, showTrash, sortConfig]);
+
+  const goToNextPatientPage = () => {
+    if (!hasMorePages || !nextPageCursor) return;
+    setPageCursors((current) => {
+      const next = current.slice(0, currentPage);
+      next[currentPage] = nextPageCursor;
+      return next;
+    });
+    setDirectoryState((current) => ({
+      ...current,
+      currentPage: current.currentPage + 1,
+    }));
+  };
+
+  const goToPreviousPatientPage = () => {
+    if (currentPageSafe <= 1) return;
+    setDirectoryState((current) => ({
+      ...current,
+      currentPage: current.currentPage - 1,
+    }));
+  };
   useEffect(() => {
     if (currentPage > totalPages) {
       setDirectoryState((current) => ({ ...current, currentPage: totalPages }));
@@ -682,16 +712,16 @@ export default function Dashboard() {
 
         <div className="flex flex-col sm:flex-row items-center justify-between p-4 border-t border-surface-200 bg-surface-50 gap-4">
           <p className="text-sm text-slate-500">
-            Showing <span className="font-medium text-slate-900">{totalResults > 0 ? pageStartIndex + 1 : 0}</span> to <span className="font-medium text-slate-900">{Math.min(pageStartIndex + PATIENTS_PER_PAGE, totalResults)}</span> of <span className="font-medium text-slate-900">{totalResults}</span> results
+            Showing <span className="font-medium text-slate-900">{activeList.length > 0 ? pageStartIndex + 1 : 0}</span> to <span className="font-medium text-slate-900">{pageStartIndex + activeList.length}</span> of <span className="font-medium text-slate-900">{totalResults}</span> results
           </p>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => setDirectoryState((current) => ({ ...current, currentPage: Math.max(1, current.currentPage - 1) }))} disabled={currentPageSafe <= 1}>
+            <Button variant="outline" size="sm" onClick={goToPreviousPatientPage} disabled={currentPageSafe <= 1}>
               Previous
             </Button>
             <div className="flex items-center px-4 text-sm font-medium text-slate-700 whitespace-nowrap">
               {currentPageSafe} / {totalPages}
             </div>
-            <Button variant="outline" size="sm" onClick={() => setDirectoryState((current) => ({ ...current, currentPage: Math.min(totalPages, current.currentPage + 1) }))} disabled={currentPageSafe >= totalPages}>
+            <Button variant="outline" size="sm" onClick={goToNextPatientPage} disabled={!hasMorePages || !nextPageCursor}>
               Next
             </Button>
           </div>

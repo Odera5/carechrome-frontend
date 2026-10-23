@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { AlertCircle } from "lucide-react";
 import api from "../services/api";
@@ -11,6 +11,7 @@ export default function TrashPatients() {
   const [selected, setSelected] = useState(new Set()); // Use Set for persistent selection
   const [toast, setToast] = useState({ message: "", type: "", show: false });
   const [loading, setLoading] = useState(false);
+  const requestIdRef = useRef(0);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
@@ -23,25 +24,30 @@ export default function TrashPatients() {
   const [confirmConfig, setConfirmConfig] = useState(null);
   const [totalPages, setTotalPages] = useState(1);
   const [totalResults, setTotalResults] = useState(0);
+  const [nextCursor, setNextCursor] = useState(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [pageCursors, setPageCursors] = useState([null]);
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const [perPage] = useState(10);
-  const paginatedPatients = () => patients;
 
   // =========================
   // FETCH TRASHED PATIENTS
   // =========================
   const fetchPatients = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
     try {
       setLoading(true);
       const res = await api.get("/patients/trash/all", {
         params: {
           page: currentPage,
           limit: perPage,
+          cursor: pageCursors[currentPage - 1] || undefined,
           search: debouncedSearch.trim() || undefined,
         },
       });
+      if (requestId !== requestIdRef.current) return;
       const pageData = Array.isArray(res.data?.data)
         ? res.data.data
         : Array.isArray(res.data)
@@ -50,16 +56,21 @@ export default function TrashPatients() {
       setPatients(pageData);
       setTotalPages(Number(res.data?.totalPages) || 1);
       setTotalResults(Number(res.data?.total) || pageData.length);
+      setNextCursor(res.data?.nextCursor || null);
+      setHasMore(Boolean(res.data?.hasMore));
     } catch (err) {
+      if (requestId !== requestIdRef.current) return;
       console.error(err);
       showToast("Failed to fetch patients", "error");
       setPatients([]);
       setTotalPages(1);
       setTotalResults(0);
+      setNextCursor(null);
+      setHasMore(false);
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) setLoading(false);
     }
-  }, [currentPage, perPage, debouncedSearch]);
+  }, [currentPage, pageCursors, perPage, debouncedSearch]);
 
   useEffect(() => {
     fetchPatients();
@@ -67,6 +78,7 @@ export default function TrashPatients() {
 
   useEffect(() => {
     setCurrentPage(1);
+    setPageCursors([null]);
   }, [debouncedSearch]);
 
   // =========================
@@ -153,9 +165,18 @@ export default function TrashPatients() {
   // =========================
   // PAGINATION
   // =========================
-  const goToPage = (page) => {
-    if (page < 1 || page > totalPages) return;
-    setCurrentPage(page);
+  const goToNextPage = () => {
+    if (!hasMore || !nextCursor) return;
+    setPageCursors((current) => {
+      const next = current.slice(0, currentPage);
+      next[currentPage] = nextCursor;
+      return next;
+    });
+    setCurrentPage((page) => page + 1);
+  };
+
+  const goToPreviousPage = () => {
+    if (currentPage > 1) setCurrentPage((page) => page - 1);
   };
 
   return (
@@ -242,26 +263,18 @@ export default function TrashPatients() {
         <div className="mt-4 flex justify-center gap-2">
           <button
             className="px-3 py-1 border rounded"
-            onClick={() => goToPage(currentPage - 1)}
+            onClick={goToPreviousPage}
             disabled={currentPage === 1}
           >
             Prev
           </button>
-          {Array.from({ length: totalPages }, (_, i) => (
-            <button
-              key={i + 1}
-              className={`px-3 py-1 border rounded ${
-                currentPage === i + 1 ? "bg-gray-300" : ""
-              }`}
-              onClick={() => goToPage(i + 1)}
-            >
-              {i + 1}
-            </button>
-          ))}
+          <span className="px-3 py-1 text-sm text-slate-600">
+            Page {currentPage} of {totalPages}
+          </span>
           <button
             className="px-3 py-1 border rounded"
-            onClick={() => goToPage(currentPage + 1)}
-            disabled={currentPage === totalPages}
+            onClick={goToNextPage}
+            disabled={!hasMore || !nextCursor}
           >
             Next
           </button>
@@ -279,4 +292,3 @@ export default function TrashPatients() {
     </motion.div>
   );
 }
-
