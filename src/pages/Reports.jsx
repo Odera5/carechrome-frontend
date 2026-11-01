@@ -291,6 +291,15 @@ export default function Reports() {
       (total, month) => total + month.total,
       0,
     );
+    const newPatientTotalsByBranch = Object.fromEntries(
+      growthBranches.map((branch) => [
+        branch.branchId,
+        growthMonths.reduce(
+          (total, month) => total + Number(month[branch.branchId] || 0),
+          0,
+        ),
+      ]),
+    );
     
     // Status color mapping
     const statusColors = {
@@ -649,6 +658,75 @@ export default function Reports() {
                                   ))}
                                 </BarChart>
                               </ResponsiveContainer>
+                            </div>
+                            <div className="mt-5">
+                              <h4 className="mb-2 text-sm font-bold text-slate-800">
+                                Monthly breakdown
+                              </h4>
+                              <div className="overflow-x-auto rounded-xl border border-amber-100 bg-white">
+                                <table className="min-w-full text-left text-xs">
+                                  <thead className="bg-amber-50 text-slate-600">
+                                    <tr>
+                                      <th className="sticky left-0 bg-amber-50 px-3 py-2.5 font-semibold">
+                                        Month
+                                      </th>
+                                      {growthBranches.map((branch) => (
+                                        <th
+                                          key={branch.branchId}
+                                          className="whitespace-nowrap px-3 py-2.5 text-right font-semibold"
+                                        >
+                                          {branch.branchName}
+                                        </th>
+                                      ))}
+                                      <th className="whitespace-nowrap px-3 py-2.5 text-right font-bold text-slate-800">
+                                        Total
+                                      </th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-slate-100">
+                                    {growthMonths.map((month) => (
+                                      <tr key={month.monthKey}>
+                                        <th className="sticky left-0 bg-white px-3 py-2.5 font-medium text-slate-700">
+                                          {month.month}
+                                        </th>
+                                        {growthBranches.map((branch) => (
+                                          <td
+                                            key={branch.branchId}
+                                            className="px-3 py-2.5 text-right tabular-nums text-slate-600"
+                                          >
+                                            {Number(
+                                              month[branch.branchId] || 0,
+                                            ).toLocaleString()}
+                                          </td>
+                                        ))}
+                                        <td className="px-3 py-2.5 text-right font-bold tabular-nums text-slate-900">
+                                          {Number(month.total).toLocaleString()}
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                  <tfoot className="border-t border-amber-200 bg-amber-50/70">
+                                    <tr>
+                                      <th className="sticky left-0 bg-amber-50 px-3 py-2.5 font-bold text-slate-800">
+                                        Period total
+                                      </th>
+                                      {growthBranches.map((branch) => (
+                                        <td
+                                          key={branch.branchId}
+                                          className="px-3 py-2.5 text-right font-bold tabular-nums text-slate-800"
+                                        >
+                                          {newPatientTotalsByBranch[
+                                            branch.branchId
+                                          ].toLocaleString()}
+                                        </td>
+                                      ))}
+                                      <td className="px-3 py-2.5 text-right font-extrabold tabular-nums text-slate-900">
+                                        {newPatientTotal.toLocaleString()}
+                                      </td>
+                                    </tr>
+                                  </tfoot>
+                                </table>
+                              </div>
                             </div>
                           </div>
                        )}
