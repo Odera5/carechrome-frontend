@@ -595,6 +595,7 @@ export default function Signup() {
                                    size="sm"
                                    onClick={() => handleBillingAccessChange(member)}
                                    disabled={isBusy || currentUser?.role !== "admin"}
+                                   className="!w-auto whitespace-nowrap"
                                  >
                                    {member.canAccessBilling ? "Granted" : "Grant access"}
                                  </Button>
@@ -628,6 +629,7 @@ export default function Signup() {
                                         size="sm"
                                         onClick={() => openRoleEditor(member)}
                                         disabled={isBusy}
+                                        className="!w-auto whitespace-nowrap"
                                       >
                                         Change role
                                       </Button>
