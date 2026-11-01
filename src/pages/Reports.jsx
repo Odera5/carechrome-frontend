@@ -237,6 +237,12 @@ export default function Reports() {
 
     // ACTUAL PRO CONTENT
     const totalRevenue = data.revenueByMonth.reduce((acc, curr) => acc + curr.revenue, 0);
+    const revenueByBranch = data.enterprise?.revenueByBranch || [];
+    const branchRevenueTotal = revenueByBranch.reduce(
+      (total, branch) => total + branch.total,
+      0,
+    );
+    const maxBranchRev = Math.max(...revenueByBranch.map((branch) => branch.total), 1);
     
     // Status color mapping
     const statusColors = {
@@ -516,14 +522,12 @@ export default function Reports() {
                        </CardTitle>
                     </CardHeader>
                     <CardContent className="p-6">
-                       {!data.enterprise.revenueByBranch?.length ? (
+                       {!revenueByBranch.length ? (
                           <div className="text-sm text-slate-400 italic text-center py-4">No revenue data across branches.</div>
                        ) : (
                           <div className="space-y-5">
-                             {data.enterprise.revenueByBranch.map((branch, idx) => {
-                                const maxBranchRev = Math.max(...data.enterprise.revenueByBranch.map(b => b.total), 1);
-                                return (
-                                  <div key={idx} className="space-y-1.5">
+                             {revenueByBranch.map((branch) => (
+                                  <div key={branch.branchId} className="space-y-1.5">
                                      <div className="flex justify-between text-sm">
                                         <span className="font-bold text-slate-700">{branch.branchName}</span>
                                         <span className="font-extrabold text-slate-900">₦{branch.total.toLocaleString()}</span>
@@ -532,8 +536,11 @@ export default function Reports() {
                                         <div className="bg-gradient-to-r from-amber-400 to-orange-500 h-full rounded-full transition-all duration-1000" style={{ width: `${Math.max((branch.total / maxBranchRev) * 100, 2)}%` }}></div>
                                      </div>
                                   </div>
-                                )
-                             })}
+                             ))}
+                             <div className="flex justify-between border-t border-amber-200 pt-4 text-sm">
+                                <span className="font-bold text-slate-700">Total clinic revenue</span>
+                                <span className="font-extrabold text-slate-900">₦{branchRevenueTotal.toLocaleString()}</span>
+                             </div>
                           </div>
                        )}
                     </CardContent>
