@@ -651,7 +651,7 @@ export default function Signup() {
                                         Convert role
                                       </Button>
                                     )}
-                                  <Button variant={member.isActive ? "outline" : "primary"} size="sm" onClick={() => handleStatusChange(member)} disabled={isBusy || isCurrentUser || member.isClinicOwner || cannotManageAdmin} className={member.isActive ? "bg-red-600 text-white border-red-600 hover:bg-red-700 hover:text-white hover:border-red-700" : "bg-green-600 hover:bg-green-700 text-white"}>
+                                  <Button variant="primary" size="sm" onClick={() => handleStatusChange(member)} disabled={isBusy || isCurrentUser || member.isClinicOwner || cannotManageAdmin} className={member.isActive ? "!bg-red-600 !text-white !border-red-600 hover:!bg-red-700 hover:!border-red-700" : "bg-green-600 hover:bg-green-700 text-white"}>
                                     {isBusy ? "..." : member.isActive ? <Power size={14} className="mr-1" /> : <CheckCircle2 size={14} className="mr-1" />}
                                     {member.isActive ? <span className="hidden sm:inline">Suspend</span> : <span className="hidden sm:inline">Enable</span>}
                                   </Button>
