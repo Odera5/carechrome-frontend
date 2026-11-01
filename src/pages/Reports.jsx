@@ -287,19 +287,6 @@ export default function Reports() {
     const newPatientGrowth = data.enterprise?.newPatientsByBranch;
     const growthBranches = newPatientGrowth?.branches || [];
     const growthMonths = newPatientGrowth?.months || [];
-    const newPatientTotal = growthMonths.reduce(
-      (total, month) => total + month.total,
-      0,
-    );
-    const newPatientTotalsByBranch = Object.fromEntries(
-      growthBranches.map((branch) => [
-        branch.branchId,
-        growthMonths.reduce(
-          (total, month) => total + Number(month[branch.branchId] || 0),
-          0,
-        ),
-      ]),
-    );
     
     // Status color mapping
     const statusColors = {
@@ -615,12 +602,6 @@ export default function Reports() {
                           <div className="text-sm text-slate-400 italic text-center py-4">No new patient data across branches for this period.</div>
                        ) : (
                           <div>
-                            <p className="mb-3 text-sm text-slate-600">
-                              <span className="font-bold text-slate-900">
-                                {newPatientTotal.toLocaleString()}
-                              </span>{" "}
-                              new patients in this period
-                            </p>
                             <div className="h-72">
                               <ResponsiveContainer width="100%" height="100%">
                                 <BarChart
@@ -705,26 +686,6 @@ export default function Reports() {
                                       </tr>
                                     ))}
                                   </tbody>
-                                  <tfoot className="border-t border-amber-200 bg-amber-50/70">
-                                    <tr>
-                                      <th className="sticky left-0 bg-amber-50 px-3 py-2.5 font-bold text-slate-800">
-                                        Period total
-                                      </th>
-                                      {growthBranches.map((branch) => (
-                                        <td
-                                          key={branch.branchId}
-                                          className="px-3 py-2.5 text-right font-bold tabular-nums text-slate-800"
-                                        >
-                                          {newPatientTotalsByBranch[
-                                            branch.branchId
-                                          ].toLocaleString()}
-                                        </td>
-                                      ))}
-                                      <td className="px-3 py-2.5 text-right font-extrabold tabular-nums text-slate-900">
-                                        {newPatientTotal.toLocaleString()}
-                                      </td>
-                                    </tr>
-                                  </tfoot>
                                 </table>
                               </div>
                             </div>
