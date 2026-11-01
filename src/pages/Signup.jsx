@@ -218,8 +218,7 @@ export default function Signup() {
     }
   };
 
-  const handleStatusChange = async (staffMember) => {
-    const nextStatus = !staffMember.isActive;
+  const executeStatusChange = async (staffMember, nextStatus) => {
     try {
       setBusyStaffId(staffMember.id);
       const response = await api.patch(`/auth/staff/${staffMember.id}/status`, { isActive: nextStatus });
@@ -227,6 +226,22 @@ export default function Signup() {
       fetchStaff();
     } catch (err) { showToast(err.response?.data?.message || "Failed to update status", "error"); } 
     finally { setBusyStaffId(""); }
+  };
+
+  const handleStatusChange = (staffMember) => {
+    if (staffMember.isActive) {
+      setConfirmConfig({
+        title: "Suspend Staff Account",
+        message: `${staffMember.name} will no longer be able to sign in. Their account and existing records will remain. Do you want to suspend this account?`,
+        confirmText: "Suspend Account",
+        cancelText: "Cancel",
+        danger: true,
+        onConfirm: () => executeStatusChange(staffMember, false),
+      });
+      return;
+    }
+
+    executeStatusChange(staffMember, true);
   };
 
   const openRoleEditor = (member) => {
