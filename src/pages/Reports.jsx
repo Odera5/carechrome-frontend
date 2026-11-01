@@ -7,7 +7,29 @@ import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/Card"
 import Button from "../components/ui/Button";
 import { hasActiveProAccess } from "../utils/clinicAccess";
 import { getStoredUserObject } from "../utils/authStorage";
-import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+} from "recharts";
+
+const branchChartColors = [
+  "#f59e0b",
+  "#0ea5e9",
+  "#10b981",
+  "#f43f5e",
+  "#8b5cf6",
+  "#f97316",
+  "#14b8a6",
+  "#6366f1",
+];
 
 const CustomTooltip = ({ active, payload }) => {
   if (active && payload && payload.length) {
@@ -19,6 +41,25 @@ const CustomTooltip = ({ active, payload }) => {
     );
   }
   return null;
+};
+
+const NewPatientsTooltip = ({ active, payload, label }) => {
+  if (!active || !payload?.length) return null;
+
+  const total = Number(payload[0]?.payload?.total || 0);
+  return (
+    <div className="rounded-xl border border-slate-800 bg-slate-900 p-3 text-xs font-bold text-white shadow-xl">
+      <p className="mb-1 text-slate-400">{label}</p>
+      <p className="mb-2 text-sm text-white">Total: {total.toLocaleString()}</p>
+      {payload
+        .filter((entry) => Number(entry.value) > 0)
+        .map((entry) => (
+          <p key={entry.dataKey} style={{ color: entry.color }}>
+            {entry.name}: {Number(entry.value).toLocaleString()}
+          </p>
+        ))}
+    </div>
+  );
 };
 
 export default function Reports() {
@@ -243,6 +284,13 @@ export default function Reports() {
       0,
     );
     const maxBranchRev = Math.max(...revenueByBranch.map((branch) => branch.total), 1);
+    const newPatientGrowth = data.enterprise?.newPatientsByBranch;
+    const growthBranches = newPatientGrowth?.branches || [];
+    const growthMonths = newPatientGrowth?.months || [];
+    const newPatientTotal = growthMonths.reduce(
+      (total, month) => total + month.total,
+      0,
+    );
     
     // Status color mapping
     const statusColors = {
@@ -550,20 +598,58 @@ export default function Reports() {
                     <CardHeader className="border-b border-amber-100 pb-4 bg-amber-50/50">
                        <CardTitle className="flex items-center gap-2 text-slate-800">
                          <Users className="text-orange-500" size={20} />
-                         Appointments by Branch
+                         New Patients by Branch
                        </CardTitle>
                     </CardHeader>
                     <CardContent className="p-6">
-                       {!data.enterprise.appointmentsByBranch?.length ? (
-                          <div className="text-sm text-slate-400 italic text-center py-4">No appointment data across branches.</div>
+                       {!growthBranches.length || !growthMonths.length ? (
+                          <div className="text-sm text-slate-400 italic text-center py-4">No new patient data across branches for this period.</div>
                        ) : (
-                          <div className="space-y-4">
-                             {data.enterprise.appointmentsByBranch.map((branch, idx) => (
-                                <div key={idx} className="flex justify-between items-center p-3.5 rounded-xl border border-amber-100/50 bg-white shadow-sm">
-                                   <span className="font-bold text-slate-700">{branch.branchName}</span>
-                                   <span className="bg-orange-100 text-orange-700 px-4 py-1.5 rounded-lg text-sm font-black">{branch.count} Visits</span>
-                                </div>
-                             ))}
+                          <div>
+                            <p className="mb-3 text-sm text-slate-600">
+                              <span className="font-bold text-slate-900">
+                                {newPatientTotal.toLocaleString()}
+                              </span>{" "}
+                              new patients in this period
+                            </p>
+                            <div className="h-72">
+                              <ResponsiveContainer width="100%" height="100%">
+                                <BarChart
+                                  data={growthMonths}
+                                  margin={{ top: 8, right: 8, left: -20, bottom: 8 }}
+                                >
+                                  <CartesianGrid
+                                    strokeDasharray="3 3"
+                                    vertical={false}
+                                  />
+                                  <XAxis
+                                    dataKey="month"
+                                    tick={{ fontSize: 11 }}
+                                    tickLine={false}
+                                  />
+                                  <YAxis
+                                    allowDecimals={false}
+                                    tick={{ fontSize: 11 }}
+                                    tickLine={false}
+                                  />
+                                  <Tooltip content={<NewPatientsTooltip />} />
+                                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                                  {growthBranches.map((branch, index) => (
+                                    <Bar
+                                      key={branch.branchId}
+                                      dataKey={branch.branchId}
+                                      name={branch.branchName}
+                                      stackId="new-patients"
+                                      fill={
+                                        branchChartColors[
+                                          index % branchChartColors.length
+                                        ]
+                                      }
+                                    />
+                                  ))}
+                                </BarChart>
+                              </ResponsiveContainer>
+                            </div>
                           </div>
                        )}
                     </CardContent>
