@@ -68,6 +68,7 @@ const ResetPassword = lazyWithRetry(() => import("./pages/ResetPassword"));
 const AppointmentResponse = lazyWithRetry(() => import("./pages/AppointmentResponse"));
 const DashboardLayout = lazyWithRetry(() => import("./components/layout/DashboardLayout"));
 const AuditLogs = lazyWithRetry(() => import("./pages/AuditLogs"));
+const PlatformTrialFollowUps = lazyWithRetry(() => import("./pages/PlatformTrialFollowUps"));
 
 function RouteLoader() {
   return (
@@ -123,6 +124,10 @@ function App() {
             <Route path="/billing/paystack/callback" element={<PaystackCallback />} />
             <Route path="/support" element={<Support />} />
             <Route path="/intake/:clinicId" element={<PatientIntakeForm />} />
+            <Route
+              path="/platform/trial-follow-ups"
+              element={<PlatformTrialFollowUps />}
+            />
 
             {/* Protected routes - wrapped with Sidebar Layout */}
             <Route element={<ProtectedLayout />}>

@@ -13,8 +13,10 @@ export default function ConfirmModal({
   cancelText = "Cancel",
   danger = false,
   confirmLoading = false,
+  confirmDisabled = false,
   closeOnConfirm = true,
   onCancelClick,
+  children,
 }) {
   return (
     <AnimatePresence>
@@ -63,6 +65,7 @@ export default function ConfirmModal({
               <p className="text-slate-500 mt-2 text-sm leading-relaxed text-left">
                 {message}
               </p>
+              {children}
             </div>
             
             <div className="bg-slate-50 px-6 py-4 flex flex-col-reverse sm:flex-row justify-end gap-3 border-t border-slate-100">
@@ -83,6 +86,7 @@ export default function ConfirmModal({
               <Button 
                 className={`w-full sm:w-auto shadow-sm ${danger ? 'bg-red-600 hover:bg-red-700 text-white border-red-600' : ''}`}
                 isLoading={confirmLoading}
+                disabled={confirmLoading || confirmDisabled}
                 onClick={() => {
                   onConfirm();
                   if (closeOnConfirm) {

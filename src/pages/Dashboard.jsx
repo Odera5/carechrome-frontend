@@ -604,7 +604,7 @@ export default function Dashboard() {
           <div className="mx-4 mt-4 p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3 text-amber-800 text-sm">
             <AlertCircle size={18} className="shrink-0 mt-0.5 text-amber-600" />
             <div>
-              <span className="font-semibold">Notice:</span> Records moved to the Trash will stay here for 6 months from the day they were deleted. After 6 months, they will be automatically and permanently deleted forever.
+              <span className="font-semibold">Notice:</span> Trashed patient charts remain recoverable. Permanent deletion requires admin review and a documented reason. Charts with payment history cannot be deleted.
             </div>
           </div>
         )}

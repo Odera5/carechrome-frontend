@@ -8,18 +8,26 @@ import api from "../services/api";
 import { resolveAssetUrl } from "../utils/assetUrl";
 import carechromeLogo from "../assets/CareChrome-white.webp";
 
+const isSubmissionKey = (value) =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value || "");
+
 export default function PatientIntakeForm() {
   const { clinicId } = useParams();
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
   const accessToken = searchParams.get("access") || "";
   const requestedBranchId = searchParams.get("branchId") || "";
+  const [submissionKey] = useState(() => {
+    const queryKey = searchParams.get("submissionId");
+    return isSubmissionKey(queryKey) ? queryKey : window.crypto.randomUUID();
+  });
   
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [clinic, setClinic] = useState(null);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
+  const [alreadySubmitted, setAlreadySubmitted] = useState(false);
   const [availableSlots, setAvailableSlots] = useState([]);
   const [slotLoading, setSlotLoading] = useState(false);
 
@@ -51,6 +59,16 @@ export default function PatientIntakeForm() {
   });
 
   useEffect(() => {
+    if (new URLSearchParams(location.search).get("submissionId") === submissionKey) {
+      return;
+    }
+
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.set("submissionId", submissionKey);
+    window.history.replaceState(window.history.state, "", nextUrl);
+  }, [location.search, submissionKey]);
+
+  useEffect(() => {
     const fetchClinic = async () => {
       try {
         const branchQuery = requestedBranchId ? `&branchId=${encodeURIComponent(requestedBranchId)}` : "";
@@ -64,6 +82,33 @@ export default function PatientIntakeForm() {
     };
     fetchClinic();
   }, [accessToken, clinicId, requestedBranchId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const checkSubmissionStatus = async () => {
+      try {
+        const branchQuery = requestedBranchId
+          ? `&branchId=${encodeURIComponent(requestedBranchId)}`
+          : "";
+        const res = await api.get(
+          `/intake/${clinicId}/submission-status?access=${encodeURIComponent(accessToken)}&submissionId=${encodeURIComponent(submissionKey)}${branchQuery}`,
+        );
+        if (!cancelled && res.data?.submitted) {
+          setAlreadySubmitted(true);
+          setSuccess(true);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err.response?.data?.message || "Unable to verify whether this intake was already submitted.");
+        }
+      }
+    };
+
+    checkSubmissionStatus();
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken, clinicId, requestedBranchId, submissionKey]);
 
   useEffect(() => {
     const favicon =
@@ -252,12 +297,14 @@ export default function PatientIntakeForm() {
     setError(null);
     try {
       const fullName = `${form.firstName?.trim() || ""} ${form.lastName?.trim() || ""} ${form.otherName?.trim() || ""}`.trim();
-      await api.post(`/intake/${clinicId}`, {
+      const response = await api.post(`/intake/${clinicId}`, {
         ...form,
         name: fullName,
         access: accessToken,
         branchId: requestedBranchId,
+        submissionKey,
       });
+      setAlreadySubmitted(Boolean(response.data?.alreadySubmitted));
       setSuccess(true);
     } catch (err) {
       setError(err.response?.data?.message || "Internal error. Please try again.");
@@ -293,9 +340,15 @@ export default function PatientIntakeForm() {
              <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 260, damping: 20 }} className="w-20 h-20 bg-emerald-100 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6">
                 <CheckCircle size={40} />
              </motion.div>
-             <h2 className="text-3xl font-extrabold text-slate-900 mb-2">Request Sent!</h2>
-             <p className="text-slate-600 mb-6">Your registration and appointment request have been securely sent to <strong>{clinic?.name}</strong>{clinic?.branch && clinic?.plan === "ENTERPRISE" ? ` (${clinic.branch.city || clinic.branch.name}${clinic.branch.area ? ` - ${clinic.branch.area}` : ""})` : ""}.</p>
-             <p className="text-sm font-medium text-slate-400">The clinic staff will review and confirm your appointment shortly. You may now close this window.</p>
+             <h2 className="text-3xl font-extrabold text-slate-900 mb-2">{alreadySubmitted ? "Already Submitted" : "Request Sent!"}</h2>
+             <p className="text-slate-600 mb-6">
+               {alreadySubmitted
+                 ? "This form has already been submitted. Please contact the clinic if you need to make a change."
+                 : <>Your registration and appointment request have been securely sent to <strong>{clinic?.name}</strong>{clinic?.branch && clinic?.plan === "ENTERPRISE" ? ` (${clinic.branch.city || clinic.branch.name}${clinic.branch.area ? ` - ${clinic.branch.area}` : ""})` : ""}.</>}
+             </p>
+             {!alreadySubmitted && (
+               <p className="text-sm font-medium text-slate-400">The clinic staff will review and confirm your appointment shortly. You may now close this window.</p>
+             )}
           </div>
        </div>
      );
