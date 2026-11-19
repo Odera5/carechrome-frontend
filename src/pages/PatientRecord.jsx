@@ -6,7 +6,6 @@ import api from "../services/api";
 import Toast from "../components/Toast";
 import Modal from "../components/PatientRecord/Modal";
 import ConfirmModal from "../components/ui/ConfirmModal";
-import ReasonConfirmModal from "../components/ui/ReasonConfirmModal";
 import RecordForm from "../components/PatientRecord/RecordForm";
 import RecordItem from "../components/PatientRecord/RecordItem";
 import SearchFilterSort from "../components/PatientRecord/SearchFilterSort";
@@ -34,7 +33,6 @@ export default function PatientRecord() {
     storedUser.role === "admin" ||
     storedUser.role === "branch_manager" ||
     storedUser.role === "doctor";
-  const canPermanentlyDeleteRecords = storedUser.role === "admin";
   const patientEditDraftKey = `carechrome:draft:patient-edit:${id}`;
   const patientEditModalKey = `carechrome:draft:patient-edit-modal:${id}`;
   const recordFiltersStorageKey = `carechrome:draft:patient-record:filters:${id}`;
@@ -90,9 +88,6 @@ export default function PatientRecord() {
   const [patientSaveLoading, setPatientSaveLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [confirmConfig, setConfirmConfig] = useState(null);
-  const [hardDeleteTargetId, setHardDeleteTargetId] = useState(null);
-  const [hardDeleteReason, setHardDeleteReason] = useState("");
-  const [hardDeleteLoading, setHardDeleteLoading] = useState(false);
   const [isTrashView, setIsTrashView] = useState(false);
   const [recordsRefreshToken, setRecordsRefreshToken] = useState(0);
 
@@ -265,45 +260,6 @@ export default function PatientRecord() {
       danger: false,
       onConfirm: () => executeRestoreRecord(recordId)
     });
-  };
-
-  const executeHardDeleteRecord = async () => {
-    if (!hardDeleteTargetId || !hardDeleteReason.trim()) return;
-
-    setHardDeleteLoading(true);
-    try {
-      await api.delete(`/patients/${id}/records/${hardDeleteTargetId}/hard`, {
-        data: { reason: hardDeleteReason.trim() },
-      });
-      const updatedTotal = Math.max(0, (recordMeta.total || 0) - 1);
-      const nextTotalPages = Math.max(1, Math.ceil(updatedTotal / RECORDS_PER_PAGE));
-      if (currentPage > nextTotalPages) {
-        setCurrentPage(nextTotalPages);
-      } else {
-        setRecords((current) =>
-          current.filter((record) => getEntityId(record) !== hardDeleteTargetId),
-        );
-        setRecordMeta((current) => ({
-          ...current,
-          total: updatedTotal,
-          totalPages: nextTotalPages,
-        }));
-      }
-      setRecordsRefreshToken((current) => current + 1);
-      showToast("Clinical record permanently deleted", "success");
-      setHardDeleteTargetId(null);
-      setHardDeleteReason("");
-    } catch (err) {
-      showToast(err.response?.data?.message || "Failed to permanently delete record", "error");
-    } finally {
-      setHardDeleteLoading(false);
-    }
-  };
-
-  const handleHardDeleteRecord = (recordId) => {
-    if (!canPermanentlyDeleteRecords) return;
-    setHardDeleteTargetId(recordId);
-    setHardDeleteReason("");
   };
 
   const handleSaveEdit = async (recordId, updatedData, removedAttachments = []) => {
@@ -496,7 +452,7 @@ export default function PatientRecord() {
       {isTrashView && (
         <div className="mt-4 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
           <AlertTriangle size={18} className="mt-0.5 shrink-0 text-amber-600" />
-          <p>Trashed clinical records remain recoverable. Admins may permanently delete a reviewed record after documenting the reason.</p>
+          <p>Clinical records moved here remain recoverable while the patient chart is active. If the chart stays in the main Trash for six months, the chart and its linked records and attachments are permanently deleted.</p>
         </div>
       )}
 
@@ -515,7 +471,7 @@ export default function PatientRecord() {
           </div>
         ) : (
           records.map((record) => (
-            <RecordItem key={getEntityId(record)} record={record} expandedRecordId={expandedRecordId} setExpandedRecordId={setExpandedRecordId} handleDelete={handleDeleteRecord} handleRestore={handleRestoreRecord} handleHardDelete={handleHardDeleteRecord} handleSaveEdit={handleSaveEdit} searchKeyword={recordFilters.searchText} canManageRecords={canManageRecords} canPermanentlyDelete={canPermanentlyDeleteRecords} />
+            <RecordItem key={getEntityId(record)} record={record} expandedRecordId={expandedRecordId} setExpandedRecordId={setExpandedRecordId} handleDelete={handleDeleteRecord} handleRestore={handleRestoreRecord} handleSaveEdit={handleSaveEdit} searchKeyword={recordFilters.searchText} canManageRecords={canManageRecords} />
           ))
         )}
       </div>
@@ -583,23 +539,6 @@ export default function PatientRecord() {
         isOpen={!!confirmConfig} 
         onClose={() => setConfirmConfig(null)} 
         {...confirmConfig} 
-      />
-      <ReasonConfirmModal
-        isOpen={Boolean(hardDeleteTargetId)}
-        onClose={() => {
-          if (!hardDeleteLoading) {
-            setHardDeleteTargetId(null);
-            setHardDeleteReason("");
-          }
-        }}
-        onConfirm={executeHardDeleteRecord}
-        title="Permanently Delete Clinical Record"
-        message="Only permanently delete a record after review confirms it was created in error or is a duplicate, and that no retention hold applies. Any allergy or comorbidity history derived from the record must be reviewed separately. This action cannot be undone."
-        confirmText="Delete Permanently"
-        danger
-        confirmLoading={hardDeleteLoading}
-        reason={hardDeleteReason}
-        onReasonChange={setHardDeleteReason}
       />
     </motion.div>
   );

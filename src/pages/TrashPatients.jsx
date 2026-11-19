@@ -4,7 +4,6 @@ import { AlertCircle } from "lucide-react";
 import api from "../services/api";
 import Toast from "../components/Toast";
 import ConfirmModal from "../components/ui/ConfirmModal";
-import ReasonConfirmModal from "../components/ui/ReasonConfirmModal";
 import { getEntityId } from "../utils/entityId";
 
 export default function TrashPatients() {
@@ -23,9 +22,6 @@ export default function TrashPatients() {
     return () => clearTimeout(handler);
   }, [search]);
   const [confirmConfig, setConfirmConfig] = useState(null);
-  const [permanentDeleteOpen, setPermanentDeleteOpen] = useState(false);
-  const [permanentDeleteReason, setPermanentDeleteReason] = useState("");
-  const [permanentDeleteLoading, setPermanentDeleteLoading] = useState(false);
   const [totalPages, setTotalPages] = useState(1);
   const [totalResults, setTotalResults] = useState(0);
   const [nextCursor, setNextCursor] = useState(null);
@@ -140,37 +136,6 @@ export default function TrashPatients() {
     });
   };
 
-  const executePermanentDelete = async () => {
-    const reason = permanentDeleteReason.trim();
-    if (!selected.size || !reason) return;
-
-    setPermanentDeleteLoading(true);
-    try {
-      await api.delete("/patients/trash/permanent", {
-        data: { ids: Array.from(selected), reason },
-      });
-      showToast("Selected patient charts permanently deleted");
-      setSelected(new Set());
-      setPermanentDeleteOpen(false);
-      setPermanentDeleteReason("");
-      fetchPatients();
-    } catch (err) {
-      console.error(err);
-      showToast(
-        err.response?.data?.message || "Failed to permanently delete patients",
-        "error",
-      );
-    } finally {
-      setPermanentDeleteLoading(false);
-    }
-  };
-
-  const handlePermanentDelete = () => {
-    if (!selected.size) return showToast("No patients selected", "error");
-    setPermanentDeleteReason("");
-    setPermanentDeleteOpen(true);
-  };
-
   // =========================
   // PAGINATION
   // =========================
@@ -195,7 +160,7 @@ export default function TrashPatients() {
       <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3 text-amber-800 text-sm">
         <AlertCircle size={18} className="shrink-0 mt-0.5 text-amber-600" />
         <div>
-          <span className="font-semibold">Notice:</span> Trashed patient charts remain recoverable. Admins may permanently delete reviewed charts after documenting the reason. Charts with payment history cannot be deleted.
+          <span className="font-semibold">Notice:</span> Patient charts are permanently deleted six months after being moved to Trash unless restored. Charts with billing records are retained.
         </div>
       </div>
 
@@ -215,13 +180,6 @@ export default function TrashPatients() {
           onClick={handleRestore}
         >
           Restore
-        </button>
-        <button
-          className="px-4 py-2 bg-red-600 text-white rounded disabled:opacity-50"
-          disabled={!selected.size || loading || permanentDeleteLoading}
-          onClick={handlePermanentDelete}
-        >
-          Permanently delete
         </button>
       </div>
 
@@ -304,23 +262,6 @@ export default function TrashPatients() {
         isOpen={!!confirmConfig}
         onClose={() => setConfirmConfig(null)}
         {...confirmConfig}
-      />
-      <ReasonConfirmModal
-        isOpen={permanentDeleteOpen}
-        onClose={() => {
-          if (!permanentDeleteLoading) {
-            setPermanentDeleteOpen(false);
-            setPermanentDeleteReason("");
-          }
-        }}
-        onConfirm={executePermanentDelete}
-        title="Permanently Delete Patient Charts"
-        message={`Only permanently delete selected charts after review confirms they were created in error or are duplicates, and that no retention hold applies. Charts with payment history cannot be deleted. This action cannot be undone.`}
-        confirmText="Delete Permanently"
-        danger
-        confirmLoading={permanentDeleteLoading}
-        reason={permanentDeleteReason}
-        onReasonChange={setPermanentDeleteReason}
       />
     </motion.div>
   );

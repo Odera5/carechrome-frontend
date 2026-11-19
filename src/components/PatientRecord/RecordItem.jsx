@@ -44,12 +44,10 @@ function RecordItem({
   setExpandedRecordId,
   handleDelete,
   handleRestore,
-  handleHardDelete,
   handleSaveEdit,
   searchKeyword,
   virtualizer,
   canManageRecords = false,
-  canPermanentlyDelete = false,
 }) {
   const formatWithCommas = (text) => {
     if (!text) return text;
@@ -503,16 +501,6 @@ function RecordItem({
                     >
                       <Activity size={16} className="mr-2" /> Restore
                     </Button>
-                    {canPermanentlyDelete && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleHardDelete(recordId)}
-                        className="w-auto flex-1 md:flex-none text-red-600 hover:text-red-700 hover:bg-red-50 focus:ring-2 focus:ring-red-500"
-                      >
-                        <Trash2 size={16} className="mr-2" /> Delete Permanently
-                      </Button>
-                    )}
                   </div>
                 )}
               </div>

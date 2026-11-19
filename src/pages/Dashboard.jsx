@@ -425,8 +425,11 @@ export default function Dashboard() {
     try {
       const res = await api.delete(`/patients/${patientId}`);
       if (res.status === 200) {
+        setPatients((current) =>
+          current.filter((patient) => getEntityId(patient) !== patientId),
+        );
+        setPatientTotal((current) => Math.max(0, current - 1));
         fetchPatients();
-        fetchTrash();
         fetchSummary();
         showToast(res.data.message || "Patient moved to Trash");
       } else showToast("Failed to delete patient", "error");
@@ -604,7 +607,7 @@ export default function Dashboard() {
           <div className="mx-4 mt-4 p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3 text-amber-800 text-sm">
             <AlertCircle size={18} className="shrink-0 mt-0.5 text-amber-600" />
             <div>
-              <span className="font-semibold">Notice:</span> Trashed patient charts remain recoverable. Permanent deletion requires admin review and a documented reason. Charts with payment history cannot be deleted.
+              <span className="font-semibold">Notice:</span> Patient charts are permanently deleted six months after being moved to Trash unless restored. Charts with billing records are retained.
             </div>
           </div>
         )}
